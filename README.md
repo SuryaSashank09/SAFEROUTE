@@ -8,7 +8,6 @@
 [![Node.js](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-green?style=for-the-badge&logo=nodedotjs)](.)
 [![MongoDB](https://img.shields.io/badge/Database-MongoDB-darkgreen?style=for-the-badge&logo=mongodb)](.)
 [![Leaflet](https://img.shields.io/badge/Maps-Leaflet.js-blue?style=for-the-badge)](.)
-[![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
 *Geethanjali College of Engineering & Technology*
 *Web Technologies (20CS22004) — Project Based Learning | Academic Year 2025–26*
@@ -208,7 +207,3 @@ token (unique), userId, expiresAt (auto-deleted via TTL index)
 ```
 
 ---
-
-## 📄 License
-
-MIT © 2026 SafeRoute — GCET Web Technologies PBL
