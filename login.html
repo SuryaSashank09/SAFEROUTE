@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRoute — Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #FF3D00;
+            --secondary: #00E5FF;
+            --dark: #0A0E27;
+            --darker: #050815;
+            --light: #F0F4F8;
+            --accent-yellow: #FFD600;
+            --accent-purple: #7C4DFF;
+            --success: #00E676;
+            --glass: rgba(255,255,255,0.04);
+            --glass-border: rgba(255,61,0,0.2);
+        }
+        body {
+            font-family: 'Syne', sans-serif;
+            background: var(--darker);
+            color: var(--light);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .bg-animation {
+            position: fixed; inset: 0; z-index: -1;
+            background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
+        }
+        .grid-overlay {
+            position: absolute; inset: 0;
+            background-image:
+                linear-gradient(rgba(255,61,0,0.07) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,61,0,0.07) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: gridMove 20s linear infinite;
+        }
+        @keyframes gridMove { 0%{transform:translate(0,0)} 100%{transform:translate(50px,50px)} }
+        .glow-orb { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.25; animation: float 15s ease-in-out infinite; }
+        .orb-1 { width:400px;height:400px;background:var(--primary);top:10%;left:5%;animation-delay:0s; }
+        .orb-2 { width:300px;height:300px;background:var(--secondary);bottom:15%;right:8%;animation-delay:5s; }
+        .orb-3 { width:250px;height:250px;background:var(--accent-purple);top:55%;right:25%;animation-delay:10s; }
+        @keyframes float {
+            0%,100% { transform: translate(0,0) scale(1); }
+            33% { transform: translate(40px,-40px) scale(1.1); }
+            66% { transform: translate(-30px,40px) scale(0.9); }
+        }
+
+        .login-wrapper {
+            display: flex;
+            width: 900px;
+            min-height: 550px;
+            border-radius: 24px;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 40px 120px rgba(0,0,0,0.6), 0 0 60px rgba(255,61,0,0.1);
+            animation: fadeInUp 0.8s ease-out both;
+        }
+        @keyframes fadeInUp {
+            from { opacity:0; transform:translateY(40px); }
+            to { opacity:1; transform:translateY(0); }
+        }
+
+        /* Left panel */
+        .login-left {
+            flex: 1;
+            background: linear-gradient(160deg, rgba(255,61,0,0.18) 0%, rgba(124,77,255,0.14) 100%);
+            backdrop-filter: blur(20px);
+            padding: 3rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+        .login-left::before {
+            content: '';
+            position: absolute;
+            top: -50px; left: -50px;
+            width: 250px; height: 250px;
+            background: radial-gradient(circle, rgba(255,61,0,0.2) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .brand { display: flex; align-items: center; gap: 0.75rem; }
+        .brand-icon {
+            width: 42px; height: 42px;
+            background: linear-gradient(135deg, var(--primary), var(--accent-yellow));
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem;
+        }
+        .brand-name {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.6rem; font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--accent-yellow));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .left-hero h2 {
+            font-size: 2rem; font-weight: 800; line-height: 1.2;
+            margin-bottom: 1rem;
+        }
+        .left-hero h2 span { color: var(--primary); }
+        .left-hero p { opacity: 0.7; font-size: 0.95rem; line-height: 1.7; }
+        .features-list { list-style: none; display: flex; flex-direction: column; gap: 0.7rem; }
+        .features-list li {
+            display: flex; align-items: center; gap: 0.75rem;
+            font-size: 0.9rem; opacity: 0.85;
+        }
+        .feat-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--primary); flex-shrink: 0;
+            box-shadow: 0 0 8px var(--primary);
+        }
+
+        /* Right panel */
+        .login-right {
+            flex: 1;
+            background: rgba(10,14,39,0.85);
+            backdrop-filter: blur(20px);
+            padding: 3rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .login-right h3 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.4rem; font-weight: 700;
+            margin-bottom: 0.4rem;
+            color: var(--light);
+        }
+        .login-right p.sub { opacity: 0.55; font-size: 0.88rem; margin-bottom: 2rem; }
+
+        .tab-switcher {
+            display: flex;
+            background: rgba(255,255,255,0.04);
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255,255,255,0.07);
+        }
+        .tab-btn {
+            flex: 1; padding: 0.55rem; border: none; background: none;
+            color: rgba(255,255,255,0.5); cursor: pointer;
+            border-radius: 7px; font-family: 'Syne', sans-serif;
+            font-size: 0.88rem; font-weight: 600; transition: all 0.3s;
+        }
+        .tab-btn.active {
+            background: var(--primary); color: white;
+            box-shadow: 0 4px 15px rgba(255,61,0,0.4);
+        }
+
+        .form-group { margin-bottom: 1.3rem; }
+        .form-group label {
+            display: block; font-size: 0.82rem; font-weight: 600;
+            opacity: 0.7; margin-bottom: 0.4rem; letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            color: var(--light);
+            font-family: 'Syne', sans-serif;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+            outline: none;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--primary);
+            background: rgba(255,61,0,0.06);
+            box-shadow: 0 0 0 3px rgba(255,61,0,0.12);
+        }
+        .form-group input::placeholder { opacity: 0.4; }
+
+        .input-row { display: flex; gap: 1rem; }
+        .input-row .form-group { flex: 1; }
+
+        .remember-row {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+        .remember-label {
+            display: flex; align-items: center; gap: 0.5rem;
+            font-size: 0.85rem; opacity: 0.7; cursor: pointer;
+        }
+        .remember-label input[type="checkbox"] {
+            width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer;
+        }
+        .forgot-link {
+            font-size: 0.85rem; color: var(--secondary); text-decoration: none;
+            opacity: 0.8; transition: opacity 0.2s;
+        }
+        .forgot-link:hover { opacity: 1; }
+
+        .btn-login {
+            width: 100%; padding: 0.9rem;
+            background: linear-gradient(135deg, var(--primary) 0%, #ff6b35 100%);
+            border: none; border-radius: 10px;
+            color: white; font-family: 'Syne', sans-serif;
+            font-size: 1rem; font-weight: 700; cursor: pointer;
+            transition: all 0.3s; letter-spacing: 0.5px;
+            box-shadow: 0 8px 25px rgba(255,61,0,0.35);
+        }
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(255,61,0,0.5);
+        }
+        .btn-login:active { transform: translateY(0); }
+
+        .divider {
+            display: flex; align-items: center; gap: 1rem;
+            margin: 1.3rem 0; opacity: 0.4; font-size: 0.8rem;
+        }
+        .divider::before, .divider::after {
+            content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.2);
+        }
+
+        .btn-google {
+            width: 100%; padding: 0.8rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px; color: var(--light);
+            font-family: 'Syne', sans-serif; font-size: 0.9rem;
+            cursor: pointer; transition: all 0.3s;
+            display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+        }
+        .btn-google:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.2); }
+
+        .form-section { display: none; }
+        .form-section.active { display: block; }
+
+        .role-select { margin-bottom: 1.3rem; }
+        .role-select label { font-size: 0.82rem; font-weight: 600; opacity: 0.7; margin-bottom: 0.5rem; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
+        .role-options { display: flex; gap: 0.8rem; }
+        .role-option {
+            flex: 1; padding: 0.6rem 0.5rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px; cursor: pointer;
+            text-align: center; font-size: 0.85rem;
+            transition: all 0.25s; background: rgba(255,255,255,0.03);
+        }
+        .role-option:hover { border-color: var(--primary); }
+        .role-option.selected { border-color: var(--primary); background: rgba(255,61,0,0.1); color: var(--primary); font-weight: 700; }
+        .role-option .role-icon { font-size: 1.2rem; display: block; margin-bottom: 0.3rem; }
+
+        .success-toast {
+            display: none;
+            position: fixed; top: 30px; right: 30px;
+            background: linear-gradient(135deg, #00E676, #00C853);
+            color: #0a1a0a; padding: 1rem 1.5rem; border-radius: 12px;
+            font-weight: 700; font-size: 0.95rem; z-index: 9999;
+            box-shadow: 0 10px 40px rgba(0,230,118,0.4);
+            animation: slideIn 0.4s ease-out;
+        }
+        @keyframes slideIn { from{transform:translateX(200px);opacity:0} to{transform:translateX(0);opacity:1} }
+
+        @media (max-width: 700px) {
+            .login-wrapper { flex-direction: column; width: 95%; }
+            .login-left { padding: 2rem; min-height: auto; }
+            .left-hero, .features-list { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation">
+        <div class="grid-overlay"></div>
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+        <div class="glow-orb orb-3"></div>
+    </div>
+
+    <div class="login-wrapper">
+        <!-- Left Panel -->
+        <div class="login-left">
+            <div class="brand">
+                <div class="brand-icon">🛣️</div>
+                <div class="brand-name">SafeRoute</div>
+            </div>
+            <div class="left-hero">
+                <h2>Smarter Roads,<br><span>Safer Journeys.</span></h2>
+                <p>Join the community-powered traffic hazard network. Real-time reporting, live maps, and data analytics for safer cities.</p>
+            </div>
+            <ul class="features-list">
+                <li><span class="feat-dot"></span>Real-time hazard reporting</li>
+                <li><span class="feat-dot"></span>Live interactive map with alerts</li>
+                <li><span class="feat-dot"></span>Community-verified incidents</li>
+                <li><span class="feat-dot"></span>Admin dashboard & analytics</li>
+            </ul>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="login-right">
+            <h3>Welcome Back</h3>
+            <p class="sub">Sign in to access your SafeRoute account</p>
+
+            <div class="tab-switcher">
+                <button class="tab-btn active" onclick="switchTab('login', this)">Sign In</button>
+                <button class="tab-btn" onclick="switchTab('register', this)">Register</button>
+            </div>
+
+            <!-- LOGIN FORM -->
+            <div class="form-section active" id="loginForm">
+                <div class="role-select">
+                    <label>Access As</label>
+                    <div class="role-options">
+                        <div class="role-option selected" onclick="selectRole(this, 'user')">
+                            <span class="role-icon">👤</span>User
+                        </div>
+                        <div class="role-option" onclick="selectRole(this, 'admin')">
+                            <span class="role-icon">🛡️</span>Admin
+                        </div>
+                        <div class="role-option" onclick="selectRole(this, 'authority')">
+                            <span class="role-icon">🚔</span>Authority
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="loginEmail" placeholder="you@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPass" placeholder="••••••••">
+                </div>
+                <div class="remember-row">
+                    <label class="remember-label">
+                        <input type="checkbox"> Remember me
+                    </label>
+                    <a href="#" class="forgot-link">Forgot password?</a>
+                </div>
+                <button class="btn-login" onclick="handleLogin()">Sign In →</button>
+                <div class="divider">or continue with</div>
+                <button class="btn-google" onclick="googleLogin()">
+                    <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                    Continue with Google
+                </button>
+            </div>
+
+            <!-- REGISTER FORM -->
+            <div class="form-section" id="registerForm">
+                <div class="input-row">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input type="text" id="regFirst" placeholder="Arjun">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input type="text" id="regLast" placeholder="Sharma">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="regEmail" placeholder="you@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="regPass" placeholder="Min. 8 characters">
+                </div>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="tel" id="regPhone" placeholder="+91 9876543210">
+                </div>
+                <div class="role-select" style="margin-bottom:1.3rem">
+                    <label style="font-size:0.82rem;font-weight:600;opacity:0.7;margin-bottom:0.5rem;display:block;text-transform:uppercase;letter-spacing:0.5px">Register As</label>
+                    <div class="role-options">
+                        <div class="role-option selected" onclick="selectRegRole(this,'user')">
+                            <span class="role-icon">👤</span>User
+                        </div>
+                        <div class="role-option" onclick="selectRegRole(this,'admin')">
+                            <span class="role-icon">🛡️</span>Admin
+                        </div>
+                        <div class="role-option" onclick="selectRegRole(this,'authority')">
+                            <span class="role-icon">🚔</span>Authority
+                        </div>
+                    </div>
+                </div>
+                                <button class="btn-login" onclick="handleRegister()">Create Account →</button>
+                <div class="divider">or continue with</div>
+                <button class="btn-google" onclick="googleLogin()">
+                    <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                    Continue with Google
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="success-toast" id="toast">✓ Login Successful! Redirecting...</div>
+
+        <script src="auth.js"></script>
+    <script>
+        /* ── Redirect if already logged in ── */
+        (function() {
+            const t = getToken(), u = getUser();
+            if (t && u) window.location.replace(
+                (u.role === 'admin' || u.role === 'authority') ? 'dashboard.html' : 'map.html'
+            );
+        })();
+
+        let selectedRole = 'user';   // login role selector
+        let regRole      = 'user';   // register role selector
+
+        /* ── Tab switch ── */
+        function switchTab(tab, btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+            document.getElementById(tab + 'Form').classList.add('active');
+            document.querySelector('.login-right h3').textContent =
+                tab === 'login' ? 'Welcome Back' : 'Create Account';
+            document.querySelector('.login-right p.sub').textContent =
+                tab === 'login' ? 'Sign in to access your SafeRoute account'
+                                : 'Join the SafeRoute community today';
+        }
+
+        /* ── Role selectors ── */
+        function selectRole(el, role) {
+            el.closest('.role-options').querySelectorAll('.role-option')
+              .forEach(r => r.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedRole = role;
+        }
+        function selectRegRole(el, role) {
+            el.closest('.role-options').querySelectorAll('.role-option')
+              .forEach(r => r.classList.remove('selected'));
+            el.classList.add('selected');
+            regRole = role;
+        }
+
+        /* ── Button loading state ── */
+        function setBusy(btn, busy, label) {
+            btn.disabled = busy;
+            btn.textContent = busy ? 'Please wait…' : label;
+        }
+
+        /* ── LOGIN ── */
+        async function handleLogin() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const pass  = document.getElementById('loginPass').value;
+
+            if (!email || !pass) { showToast('Fill in your email and password.', 'error'); return; }
+
+            const btn = document.querySelector('#loginForm .btn-login');
+            setBusy(btn, true, 'Sign In →');
+
+            try {
+                const res  = await fetch(API + '/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password: pass, role: selectedRole })
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    showToast(data.error, 'error');
+                    setBusy(btn, false, 'Sign In →');
+                    return;
+                }
+
+                saveAuth(data.data.token, data.data.user);
+                showToast('Login successful! Redirecting…', 'success');
+                setTimeout(() => {
+                    const role = data.data.user.role;
+                    window.location.replace(
+                        (role === 'admin' || role === 'authority') ? 'dashboard.html' : 'map.html'
+                    );
+                }, 900);
+
+            } catch(err) {
+                showToast('Cannot reach server. Is node server.js running?', 'error');
+                setBusy(btn, false, 'Sign In →');
+            }
+        }
+
+        /* ── REGISTER ── */
+        async function handleRegister() {
+            const first = document.getElementById('regFirst').value.trim();
+            const last  = document.getElementById('regLast').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            const pass  = document.getElementById('regPass').value;
+            const phone = document.getElementById('regPhone').value.trim();
+
+            if (!first || !email || !pass) {
+                showToast('Name, email and password are required.', 'error'); return;
+            }
+            if (pass.length < 6) {
+                showToast('Password must be at least 6 characters.', 'error'); return;
+            }
+
+            const btn = document.querySelector('#registerForm .btn-login');
+            setBusy(btn, true, 'Create Account →');
+
+            try {
+                const res  = await fetch(API + '/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: (first + ' ' + last).trim(),
+                        email, password: pass, phone,
+                        role: regRole          // ← send chosen role to backend
+                    })
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    showToast(data.error, 'error');
+                    setBusy(btn, false, 'Create Account →');
+                    return;
+                }
+
+                saveAuth(data.data.token, data.data.user);
+                showToast('Account created! Welcome to SafeRoute!', 'success');
+                setTimeout(() => {
+                    const role = data.data.user.role;
+                    window.location.replace(
+                        (role === 'admin' || role === 'authority') ? 'dashboard.html' : 'map.html'
+                    );
+                }, 900);
+
+            } catch(err) {
+                showToast('Cannot reach server. Is node server.js running?', 'error');
+                setBusy(btn, false, 'Create Account →');
+            }
+        }
+
+        function googleLogin() { showToast('Google login not configured yet.', 'error'); }
+
+        /* ── Toast ── */
+        function showToast(msg, type = 'success') {
+            const t = document.getElementById('toast');
+            t.textContent = (type === 'error' ? '❌ ' : '✅ ') + msg;
+            t.style.background = type === 'error'
+                ? 'linear-gradient(135deg,#FF3D00,#ff6b35)'
+                : 'linear-gradient(135deg,#00E676,#00C853)';
+            t.style.color = type === 'error' ? '#fff' : '#0a1a0a';
+            t.style.display = 'block';
+            clearTimeout(t._t);
+            t._t = setTimeout(() => { t.style.display = 'none'; }, 4500);
+        }
+
+        /* ── Enter key submit ── */
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Enter') return;
+            if (document.getElementById('loginForm').classList.contains('active')) handleLogin();
+            else handleRegister();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRoute — Report Hazard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #FF3D00; --secondary: #00E5FF; --dark: #0A0E27;
+            --darker: #050815; --light: #F0F4F8; --accent-yellow: #FFD600;
+            --accent-purple: #7C4DFF; --success: #00E676;
+        }
+        body { font-family: 'Syne', sans-serif; background: var(--darker); color: var(--light); min-height: 100vh; }
+
+        .bg-animation { position: fixed; inset: 0; z-index: -1; background: linear-gradient(135deg, var(--darker), var(--dark)); }
+        .grid-overlay { position:absolute;inset:0;background-image:linear-gradient(rgba(255,61,0,0.05)1px,transparent 1px),linear-gradient(90deg,rgba(255,61,0,0.05)1px,transparent 1px);background-size:50px 50px;animation:gridMove 20s linear infinite; }
+        @keyframes gridMove{0%{transform:translate(0,0)}100%{transform:translate(50px,50px)}}
+        .orb{position:absolute;border-radius:50%;filter:blur(100px);opacity:0.18;animation:float 15s ease-in-out infinite;}
+        .o1{width:500px;height:500px;background:var(--primary);top:-100px;right:-100px;}
+        .o2{width:400px;height:400px;background:var(--accent-purple);bottom:-100px;left:-100px;animation-delay:8s;}
+        @keyframes float{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-30px)}}
+
+        nav{position:sticky;top:0;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;background:rgba(10,14,39,0.97);border-bottom:1px solid rgba(255,61,0,0.2);z-index:100;}
+        .logo{font-family:'Orbitron',sans-serif;font-size:1.3rem;font-weight:900;background:linear-gradient(135deg,var(--primary),var(--accent-yellow));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+        .nav-links{display:flex;gap:0.3rem;}
+        .nav-link{padding:0.45rem 0.9rem;border-radius:8px;text-decoration:none;color:rgba(255,255,255,0.65);font-size:0.85rem;font-weight:600;transition:all 0.2s;}
+        .nav-link:hover,.nav-link.active{background:rgba(255,61,0,0.15);color:var(--primary);}
+
+        .page-wrapper { max-width: 1000px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+        .page-header { text-align: center; margin-bottom: 2.5rem; }
+        .page-header .badge {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            background: rgba(255,61,0,0.12); border: 1px solid rgba(255,61,0,0.3);
+            padding: 0.4rem 1rem; border-radius: 20px; font-size: 0.8rem;
+            font-weight: 700; color: var(--primary); margin-bottom: 1rem;
+        }
+        .page-header h1 { font-family: 'Orbitron', sans-serif; font-size: 2.2rem; font-weight: 900; margin-bottom: 0.6rem; }
+        .page-header h1 span { color: var(--primary); }
+        .page-header p { opacity: 0.6; font-size: 0.95rem; }
+
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .form-col { display: flex; flex-direction: column; gap: 1.3rem; }
+
+        .card {
+            background: rgba(255,255,255,0.025);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 16px; padding: 1.5rem;
+        }
+        .card-title {
+            font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 1px; opacity: 0.5; margin-bottom: 1.2rem;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .card-title::before { content:''; display:block; width:3px; height:14px; background:var(--primary); border-radius:2px; }
+
+        .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+        .form-group label { font-size: 0.82rem; font-weight: 600; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 0.75rem 1rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.09);
+            border-radius: 10px; color: var(--light);
+            font-family: 'Syne', sans-serif; font-size: 0.93rem;
+            transition: all 0.25s; outline: none; width: 100%;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: var(--primary);
+            background: rgba(255,61,0,0.05);
+            box-shadow: 0 0 0 3px rgba(255,61,0,0.1);
+        }
+        .form-group input::placeholder, .form-group textarea::placeholder { opacity: 0.35; }
+        .form-group select option { background: var(--dark); }
+        .form-group textarea { resize: vertical; min-height: 100px; }
+
+        .hazard-type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+        .type-option {
+            padding: 0.8rem 0.5rem;
+            border: 1px solid rgba(255,255,255,0.09);
+            border-radius: 10px; cursor: pointer;
+            text-align: center; transition: all 0.2s;
+            background: rgba(255,255,255,0.02);
+        }
+        .type-option:hover { border-color: rgba(255,61,0,0.4); background: rgba(255,61,0,0.05); }
+        .type-option.selected { border-color: var(--primary); background: rgba(255,61,0,0.12); }
+        .type-option .t-icon { font-size: 1.4rem; display: block; margin-bottom: 0.3rem; }
+        .type-option .t-label { font-size: 0.75rem; font-weight: 600; opacity: 0.8; }
+
+        .severity-slider-wrap { padding: 0.5rem 0; }
+        .sev-labels { display: flex; justify-content: space-between; font-size: 0.75rem; opacity: 0.5; margin-bottom: 0.4rem; }
+        input[type="range"] { width: 100%; -webkit-appearance: none; height: 6px; border-radius: 3px; background: linear-gradient(to right, #00E676, #FFD600, #FF3D00, #FF1744); outline: none; cursor: pointer; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.4); cursor: pointer; }
+        .sev-display { text-align: center; margin-top: 0.5rem; font-weight: 700; font-size: 0.9rem; }
+
+        .map-picker { height: 220px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); }
+        .loc-input-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+        .loc-input-row input { flex: 1; }
+        .btn-loc {
+            padding: 0.75rem 1rem; background: rgba(0,229,255,0.1);
+            border: 1px solid rgba(0,229,255,0.25); border-radius: 10px;
+            color: var(--secondary); cursor: pointer; font-size: 0.85rem;
+            white-space: nowrap; transition: all 0.2s; font-family: 'Syne', sans-serif;
+        }
+        .btn-loc:hover { background: rgba(0,229,255,0.18); }
+
+        .coords-display { font-size: 0.78rem; opacity: 0.5; font-family: 'Space Mono', monospace; display: none; }
+
+        .upload-zone {
+            border: 2px dashed rgba(255,255,255,0.12); border-radius: 10px;
+            padding: 1.5rem; text-align: center; cursor: pointer;
+            transition: all 0.25s; position: relative;
+        }
+        .upload-zone:hover { border-color: rgba(255,61,0,0.4); background: rgba(255,61,0,0.04); }
+        .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .upload-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+        .upload-text { font-size: 0.85rem; opacity: 0.5; }
+        .upload-text strong { color: var(--secondary); }
+        .image-preview-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 0.5rem; margin-top: 0.75rem; }
+        .img-thumb { aspect-ratio:1; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.05); position: relative; }
+        .img-thumb img { width:100%;height:100%;object-fit:cover; }
+
+        .submit-section { margin-top: 2rem; }
+        .submit-check { display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem; font-size: 0.88rem; opacity: 0.75; }
+        .submit-check input[type="checkbox"] { margin-top: 3px; accent-color: var(--primary); width: 16px; height: 16px; cursor: pointer; }
+
+        .btn-submit {
+            width: 100%; padding: 1rem;
+            background: linear-gradient(135deg, var(--primary), #ff6b35);
+            border: none; border-radius: 12px; color: white;
+            font-family: 'Syne', sans-serif; font-size: 1.05rem;
+            font-weight: 800; cursor: pointer; letter-spacing: 0.5px;
+            box-shadow: 0 10px 30px rgba(255,61,0,0.4);
+            transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+        }
+        .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(255,61,0,0.55); }
+        .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* Success overlay */
+        .success-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(5,8,21,0.92); z-index: 9999;
+            align-items: center; justify-content: center;
+        }
+        .success-overlay.show { display: flex; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        .success-box {
+            background: rgba(10,14,39,0.98); border: 1px solid rgba(0,230,118,0.3);
+            border-radius: 24px; padding: 3rem; text-align: center;
+            max-width: 420px; animation: scaleIn 0.4s ease-out;
+        }
+        @keyframes scaleIn { from{transform:scale(0.8);opacity:0} to{transform:scale(1);opacity:1} }
+        .success-icon { font-size: 4rem; margin-bottom: 1rem; }
+        .success-box h2 { font-family: 'Orbitron', sans-serif; color: var(--success); margin-bottom: 0.5rem; }
+        .success-box p { opacity: 0.65; margin-bottom: 1.5rem; font-size: 0.9rem; line-height: 1.6; }
+        .success-actions { display: flex; gap: 0.75rem; justify-content: center; }
+        .btn-sm {
+            padding: 0.65rem 1.2rem; border-radius: 10px;
+            font-family: 'Syne', sans-serif; font-size: 0.88rem;
+            font-weight: 700; cursor: pointer; transition: all 0.2s; text-decoration: none;
+        }
+        .btn-primary { background: var(--primary); border: none; color: white; }
+        .btn-outline { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: var(--light); }
+        .btn-sm:hover { opacity: 0.85; transform: translateY(-1px); }
+
+        @media(max-width:700px){ .form-grid{grid-template-columns:1fr;} .hazard-type-grid{grid-template-columns:repeat(3,1fr);} }
+    </style>
+</head>
+<body>
+    <div class="bg-animation">
+        <div class="grid-overlay"></div>
+        <div class="orb o1"></div>
+        <div class="orb o2"></div>
+    </div>
+
+    <nav>
+        <div class="logo">SafeRoute</div>
+        <div class="nav-links">
+            <a class="nav-link" href="index.html">Home</a>
+            <a class="nav-link" href="map.html">🗺️ Live Map</a>
+            <a class="nav-link active">⚠️ Report</a>
+            <a class="nav-link" href="dashboard.html">Dashboard</a>
+        </div>
+    </nav>
+
+    <div class="page-wrapper">
+        <div class="page-header">
+            <div class="badge">⚠️ Hazard Reporting System</div>
+            <h1>Report a <span>Road Hazard</span></h1>
+            <p>Help keep roads safe. Your report will be verified and added to the live map instantly.</p>
+        </div>
+
+        <div class="form-grid">
+            <!-- LEFT COLUMN -->
+            <div class="form-col">
+                <!-- Hazard Type -->
+                <div class="card">
+                    <div class="card-title">Hazard Type</div>
+                    <div class="hazard-type-grid">
+                        <div class="type-option selected" data-type="accident" onclick="selectType(this)">
+                            <span class="t-icon">💥</span><span class="t-label">Accident</span>
+                        </div>
+                        <div class="type-option" data-type="congestion" onclick="selectType(this)">
+                            <span class="t-icon">🚦</span><span class="t-label">Congestion</span>
+                        </div>
+                        <div class="type-option" data-type="roadwork" onclick="selectType(this)">
+                            <span class="t-icon">🔧</span><span class="t-label">Roadwork</span>
+                        </div>
+                        <div class="type-option" data-type="pothole" onclick="selectType(this)">
+                            <span class="t-icon">🕳️</span><span class="t-label">Pothole</span>
+                        </div>
+                        <div class="type-option" data-type="weather" onclick="selectType(this)">
+                            <span class="t-icon">🌧️</span><span class="t-label">Weather</span>
+                        </div>
+                        <div class="type-option" data-type="other" onclick="selectType(this)">
+                            <span class="t-icon">❗</span><span class="t-label">Other</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Severity -->
+                <div class="card">
+                    <div class="card-title">Severity Level</div>
+                    <div class="severity-slider-wrap">
+                        <div class="sev-labels"><span>Low</span><span>Medium</span><span>High</span><span>Critical</span></div>
+                        <input type="range" id="severitySlider" min="1" max="4" value="2" oninput="updateSeverity(this.value)">
+                        <div class="sev-display" id="sevDisplay">⚠️ Medium</div>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div class="card">
+                    <div class="card-title">Incident Details</div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="description" placeholder="Describe the hazard in detail. Number of vehicles involved, road conditions, visibility, etc."></textarea>
+                    </div>
+                    <div class="form-group" style="margin-top:1rem">
+                        <label>Additional Notes (optional)</label>
+                        <input type="text" id="notes" placeholder="E.g., Emergency services called, road partially blocked...">
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN -->
+            <div class="form-col">
+                <!-- Location -->
+                <div class="card">
+                    <div class="card-title">📍 Location</div>
+                    <div class="loc-input-row">
+                        <input type="text" id="locationText" placeholder="Enter address or landmark...">
+                        <button class="btn-loc" onclick="getMyLocation()">📍 GPS</button>
+                    </div>
+                    <div class="coords-display" id="coordsDisplay"></div>
+                    <div class="map-picker" id="pickerMap"></div>
+                    <p style="font-size:0.78rem;opacity:0.4;margin-top:0.5rem">Tap on map to pin exact location</p>
+                </div>
+
+                <!-- Reporter Info -->
+                <div class="card">
+                    <div class="card-title">Reporter Details</div>
+                    <div class="form-group">
+                        <label>Your Name (optional)</label>
+                        <input type="text" id="reporterName" placeholder="Anonymous">
+                    </div>
+                    <div class="form-group" style="margin-top:0.8rem">
+                        <label>Phone Number (optional)</label>
+                        <input type="tel" id="reporterPhone" placeholder="+91 for follow-up">
+                    </div>
+                </div>
+
+                <!-- Photo Upload -->
+                <div class="card">
+                    <div class="card-title">📷 Photo Evidence</div>
+                    <div class="upload-zone" id="uploadZone">
+                        <input type="file" accept="image/*" multiple onchange="handleImages(this)">
+                        <div class="upload-icon">📷</div>
+                        <div class="upload-text">Drop photos here or <strong>browse</strong></div>
+                        <div class="upload-text" style="margin-top:0.3rem;font-size:0.75rem">JPG, PNG up to 10MB each</div>
+                    </div>
+                    <div class="image-preview-grid" id="imagePreview"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="submit-section">
+            <div class="submit-check">
+                <input type="checkbox" id="agreeCheck">
+                <label for="agreeCheck">I confirm that this report is accurate and based on real observations. False reports may result in account suspension. This information will be shared with traffic authorities.</label>
+            </div>
+            <button class="btn-submit" id="submitBtn" onclick="submitReport()">
+                🚨 Submit Hazard Report
+            </button>
+        </div>
+    </div>
+
+    <!-- SUCCESS OVERLAY -->
+    <div class="success-overlay" id="successOverlay">
+        <div class="success-box">
+            <div class="success-icon">✅</div>
+            <h2>Report Submitted!</h2>
+            <p>Your hazard report has been received and will be verified shortly. It will appear on the live map once confirmed. Thank you for keeping roads safe!</p>
+            <div class="success-actions">
+                <a href="map.html?newReport=true" class="btn-sm btn-primary">View on Map</a>
+                <button class="btn-sm btn-outline" onclick="resetForm()">Report Another</button>
+            </div>
+        </div>
+    </div>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="auth.js"></script>
+    <script>
+        /* ── Auth guard ── */
+        if (!requireAuth()) { /* redirected */ }
+
+        /* ── State ── */
+        let selectedType = 'accident';
+        let selectedLat  = 17.4326;
+        let selectedLng  = 78.4071;
+        const SEV_MAP    = { 1:'low', 2:'medium', 3:'high', 4:'critical' };
+        const SEV_LABELS = { 1:'✅ Low', 2:'⚠️ Medium', 3:'🔴 High', 4:'🚨 Critical' };
+        const SEV_COLORS = { 1:'#00E676', 2:'#FFD600', 3:'#FF3D00', 4:'#FF1744' };
+
+        /* ── Picker map ── */
+        const pickerMap = L.map('pickerMap', { zoomControl:false }).setView([17.4326, 78.4071], 12);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19 }).addTo(pickerMap);
+        L.control.zoom({ position:'bottomright' }).addTo(pickerMap);
+
+        let pinMarker = L.marker([17.4326, 78.4071], {
+            icon: L.divIcon({
+                className: '',
+                html: '<div style="width:20px;height:20px;background:#FF3D00;border:3px solid white;border-radius:50%;box-shadow:0 0 15px rgba(255,61,0,0.8)"></div>',
+                iconAnchor:[10,10]
+            })
+        }).addTo(pickerMap);
+
+        pickerMap.on('click', e => {
+            selectedLat = e.latlng.lat;
+            selectedLng = e.latlng.lng;
+            pinMarker.setLatLng(e.latlng);
+            setCoordDisplay(selectedLat, selectedLng);
+        });
+
+        function setCoordDisplay(lat, lng) {
+            const d = document.getElementById('coordsDisplay');
+            if (d) { d.style.display = 'block'; d.textContent = `📍 Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`; }
+        }
+
+        /* ── Type selector ── */
+        function selectType(el) {
+            document.querySelectorAll('.type-option').forEach(t => t.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedType = el.dataset.type;
+        }
+
+        /* ── Severity slider ── */
+        function updateSeverity(val) {
+            const display = document.getElementById('sevDisplay');
+            if (display) {
+                display.textContent = SEV_LABELS[val] || '';
+                display.style.color = SEV_COLORS[val] || '';
+            }
+        }
+
+        /* ── Get my GPS location ── */
+        function getMyLocation() {
+            if (!navigator.geolocation) { alert('Geolocation not supported in this browser.'); return; }
+            navigator.geolocation.getCurrentPosition(
+                pos => {
+                    selectedLat = pos.coords.latitude;
+                    selectedLng = pos.coords.longitude;
+                    pickerMap.flyTo([selectedLat, selectedLng], 15);
+                    pinMarker.setLatLng([selectedLat, selectedLng]);
+                    setCoordDisplay(selectedLat, selectedLng);
+                },
+                () => setCoordDisplay(17.4326, 78.4071)
+            );
+        }
+
+        /* ── Image preview ── */
+        function handleImages(input) {
+            const preview = document.getElementById('imagePreview');
+            if (!preview) return;
+            Array.from(input.files).slice(0, 6).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const div = document.createElement('div');
+                    div.className = 'img-thumb';
+                    div.innerHTML = `<img src="${e.target.result}" alt="Evidence">`;
+                    preview.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        /* ── Submit to real API ── */
+        async function submitReport() {
+            const desc     = (document.getElementById('description')?.value || '').trim();
+            const location = (document.getElementById('locationText')?.value || '').trim();
+            const agree    = document.getElementById('agreeCheck')?.checked;
+            const sevSlider = document.getElementById('sevSlider');
+            const severity = SEV_MAP[sevSlider?.value || 2] || 'medium';
+
+            /* Validation */
+            if (!location) {
+                document.getElementById('locationText')?.focus();
+                showFormError('Please enter a location name.');
+                return;
+            }
+            if (!desc) {
+                document.getElementById('description')?.focus();
+                showFormError('Please describe the hazard.');
+                return;
+            }
+            if (!agree) {
+                showFormError('Please confirm the report accuracy before submitting.');
+                return;
+            }
+
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Submitting…';
+
+            try {
+                const user = getUser();
+                const res  = await authFetch(API + '/hazards', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        type: selectedType,
+                        severity,
+                        lat: selectedLat,
+                        lng: selectedLng,
+                        location,
+                        description: desc,
+                        reporterName: user?.name || 'Anonymous'
+                    })
+                });
+
+                if (!res) return; // 401 — authFetch redirected
+
+                const data = await res.json();
+
+                if (data.success) {
+                    clearFormError();
+                    document.getElementById('successOverlay')?.classList.add('show');
+                } else {
+                    showFormError('Submission failed: ' + data.error);
+                }
+            } catch(err) {
+                showFormError('Cannot reach server. Make sure node server.js is running.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🚨 Submit Hazard Report';
+            }
+        }
+
+        function showFormError(msg) {
+            let err = document.getElementById('_formErr');
+            if (!err) {
+                err = document.createElement('div');
+                err.id = '_formErr';
+                err.style.cssText = 'color:#FF3D00;font-size:0.85rem;font-weight:700;margin-top:-0.5rem;margin-bottom:0.5rem;padding:0.6rem 1rem;background:rgba(255,61,0,0.1);border-radius:8px;border:1px solid rgba(255,61,0,0.3)';
+                document.getElementById('submitBtn')?.parentNode?.insertBefore(err, document.getElementById('submitBtn'));
+            }
+            err.textContent = '❌ ' + msg;
+        }
+        function clearFormError() {
+            document.getElementById('_formErr')?.remove();
+        }
+
+        /* ── Reset form after success ── */
+        function resetForm() {
+            document.getElementById('successOverlay')?.classList.remove('show');
+            ['description','locationText','notes'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            const chk = document.getElementById('agreeCheck');
+            if (chk) chk.checked = false;
+            const preview = document.getElementById('imagePreview');
+            if (preview) preview.innerHTML = '';
+            clearFormError();
+        }
+
+        setTimeout(getMyLocation, 600);
+    </script>
+</body>
+</html>

@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRoute — Live Hazard Map</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #FF3D00; --secondary: #00E5FF;
+            --dark: #0A0E27;    --darker: #050815;
+            --light: #F0F4F8;   --success: #00E676;
+            --accent-yellow: #FFD600;
+        }
+
+        html, body {
+            width: 100%; height: 100%;
+            overflow: hidden;
+            font-family: 'Syne', sans-serif;
+            background: var(--darker); color: var(--light);
+        }
+
+        /* ── NAV ── */
+        #nav {
+            position: fixed; top: 0; left: 0; right: 0; height: 60px;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 1.5rem;
+            background: rgba(10,14,39,0.99);
+            border-bottom: 1px solid rgba(255,61,0,0.22);
+            z-index: 2000;
+        }
+        .nav-logo {
+            font-family: 'Orbitron', sans-serif; font-size: 1.25rem; font-weight: 900;
+            background: linear-gradient(135deg,var(--primary),var(--accent-yellow));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .nav-links { display: flex; gap: 0.2rem; }
+        .nav-link {
+            padding: 0.4rem 0.85rem; border-radius: 8px; text-decoration: none;
+            color: rgba(255,255,255,0.55); font-size: 0.84rem; font-weight: 600; transition: all 0.2s;
+        }
+        .nav-link:hover, .nav-link.active { background: rgba(255,61,0,0.15); color: var(--primary); }
+        .user-pill {
+            background: rgba(255,255,255,0.06); padding: 0.3rem 0.9rem;
+            border-radius: 20px; font-size: 0.8rem; opacity: 0.85;
+        }
+
+        /* ── LAYOUT ── */
+        #layout {
+            position: fixed; top: 60px; left: 0; right: 0; bottom: 0;
+            display: flex;
+        }
+
+        /* ── SIDEBAR ── */
+        #sidebar {
+            width: 300px; flex-shrink: 0;
+            background: rgba(8,12,30,0.99);
+            border-right: 1px solid rgba(255,61,0,0.12);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .sb-head {
+            padding: 0.9rem 1.1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+        }
+        .sb-title { font-size: 0.9rem; font-weight: 700; }
+        .live-pill {
+            display: flex; align-items: center; gap: 0.35rem;
+            font-size: 0.7rem; color: var(--success); font-weight: 700; letter-spacing: 0.5px;
+        }
+        .live-dot {
+            width: 7px; height: 7px; border-radius: 50%; background: var(--success);
+            animation: livepulse 1.4s ease-in-out infinite;
+        }
+        @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.6)} }
+
+        /* Filter chips */
+        .filter-bar { padding: 0.65rem 1.1rem; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+        .filter-lbl { font-size: 0.65rem; opacity: 0.35; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.8px; }
+        .chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+        .chip {
+            padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+            cursor: pointer; border: 1px solid rgba(255,255,255,0.1);
+            background: transparent; color: rgba(255,255,255,0.5); transition: all 0.2s;
+            font-family: 'Syne', sans-serif;
+        }
+        .chip.on  { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 2px 12px rgba(255,61,0,0.4); }
+        .chip:hover:not(.on) { border-color: rgba(255,61,0,0.4); color: rgba(255,255,255,0.9); }
+
+        /* Hazard list */
+        #hazardList { flex: 1; overflow-y: auto; padding: 0.4rem; }
+        #hazardList::-webkit-scrollbar { width: 3px; }
+        #hazardList::-webkit-scrollbar-thumb { background: rgba(255,61,0,0.2); border-radius: 2px; }
+
+        .hcard {
+            padding: 0.75rem 0.9rem; border-radius: 10px; margin-bottom: 0.4rem;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+            cursor: pointer; transition: all 0.18s;
+        }
+        .hcard:hover { background: rgba(255,61,0,0.07); border-color: rgba(255,61,0,0.3); transform: translateX(3px); }
+        .hcard.hl    { border-color: var(--primary); background: rgba(255,61,0,0.1); }
+        .hcard-top   { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.3rem; }
+        .hcard-type  { font-size: 0.82rem; font-weight: 700; }
+        .sbadge      { font-size: 0.66rem; padding: 0.15rem 0.46rem; border-radius: 4px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; }
+        .sc { background: rgba(255,23,68,0.2);  color: #FF1744; }
+        .sh { background: rgba(255,61,0,0.2);   color: #FF5722; }
+        .sm { background: rgba(255,214,0,0.2);  color: #E6A800; }
+        .sl { background: rgba(0,200,83,0.2);   color: #00C853; }
+        .hcard-loc  { font-size: 0.76rem; opacity: 0.55; margin-bottom: 0.15rem; }
+        .hcard-time { font-size: 0.68rem; opacity: 0.32; }
+
+        /* Stats row */
+        .stats-row {
+            padding: 0.6rem 1.1rem; border-top: 1px solid rgba(255,255,255,0.06);
+            display: flex; flex-shrink: 0;
+        }
+        .stat-m { flex: 1; text-align: center; }
+        .stat-n { font-family: 'Orbitron', sans-serif; font-size: 1.05rem; font-weight: 700; }
+        .stat-l { font-size: 0.62rem; opacity: 0.35; margin-top: 0.08rem; }
+
+        /* ── MAP WRAP ── */
+        #mapWrap { flex: 1; position: relative; min-width: 0; }
+
+        /* Leaflet MUST have explicit pixel size — absolute fill guarantees this */
+        #map {
+            position: absolute !important;
+            inset: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: 1;
+        }
+
+        /* Controls */
+        .mcontrols {
+            position: absolute; top: 14px; right: 14px; z-index: 500;
+            display: flex; flex-direction: column; gap: 0.4rem;
+        }
+        .mbtn {
+            width: 38px; height: 38px;
+            background: rgba(8,12,30,0.94); border: 1px solid rgba(255,61,0,0.3);
+            border-radius: 8px; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; font-size: 1rem; color: var(--light); transition: all 0.2s;
+        }
+        .mbtn:hover { background: rgba(255,61,0,0.2); border-color: var(--primary); }
+
+        /* FAB */
+        .fab {
+            position: absolute; bottom: 22px; right: 18px; z-index: 500;
+            background: linear-gradient(135deg,#FF3D00,#ff6d3a); border: none;
+            border-radius: 50px; padding: 0.82rem 1.4rem;
+            color: #fff; font-family: 'Syne', sans-serif; font-size: 0.88rem; font-weight: 800;
+            cursor: pointer; box-shadow: 0 8px 28px rgba(255,61,0,0.5);
+            display: flex; align-items: center; gap: 0.5rem;
+            transition: all 0.28s; text-decoration: none;
+        }
+        .fab:hover { transform: translateY(-3px); box-shadow: 0 14px 38px rgba(255,61,0,0.7); }
+
+        /* Loader */
+        #mapLoader {
+            position: absolute; inset: 0; z-index: 50;
+            background: rgba(5,8,20,0.92);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 1rem;
+            font-size: 0.86rem; color: rgba(240,244,248,0.7);
+        }
+        .spin {
+            width: 36px; height: 36px;
+            border: 3px solid rgba(255,61,0,0.15); border-top-color: var(--primary);
+            border-radius: 50%; animation: spinning 0.8s linear infinite;
+        }
+        @keyframes spinning { to { transform: rotate(360deg); } }
+
+        /* Toast */
+        .toast {
+            position: absolute; top: 13px; left: 50%; transform: translateX(-50%);
+            background: rgba(8,12,28,0.97); border: 1px solid rgba(255,61,0,0.3);
+            padding: 0.5rem 1.3rem; border-radius: 30px; z-index: 600;
+            font-size: 0.79rem; white-space: nowrap; backdrop-filter: blur(10px);
+            box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+            animation: toastIn 0.35s ease-out both;
+        }
+        @keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(-8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+
+        /* Popup */
+        .leaflet-popup-content-wrapper {
+            background: rgba(8,12,28,0.97) !important; color: #F0F4F8 !important;
+            border: 1px solid rgba(255,61,0,0.35) !important; border-radius: 14px !important;
+            box-shadow: 0 18px 55px rgba(0,0,0,0.7) !important; padding: 0 !important;
+        }
+        .leaflet-popup-content { margin: 0 !important; }
+        .leaflet-popup-tip { background: rgba(8,12,28,0.97) !important; }
+        .leaflet-popup-close-button { color: rgba(255,255,255,0.4) !important; top:7px !important; right:9px !important; }
+        .pbox { padding: 0.9rem 1rem; min-width: 220px; }
+        .pbox-head { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.5rem; }
+        .pbox-icon { font-size: 1.3rem; }
+        .pbox-type { font-family:'Orbitron',sans-serif; font-size:0.78rem; color:var(--primary); font-weight:700; text-transform:uppercase; }
+        .pbox-sev  { display:inline-block; margin-bottom:0.45rem; padding:0.18rem 0.5rem; border-radius:4px; font-size:0.68rem; font-weight:800; letter-spacing:0.4px; }
+        .pbox-loc  { font-size:0.78rem; opacity:0.65; margin-bottom:0.3rem; }
+        .pbox-desc { font-size:0.74rem; opacity:0.5; line-height:1.5; margin-bottom:0.5rem; }
+        .pbox-foot { display:flex; justify-content:space-between; font-size:0.68rem; }
+        .pbox-time { opacity:0.33; }
+        .pbox-ver  { color:var(--success); font-weight:700; }
+
+        /* Pins */
+        .hpin { width:32px; height:32px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); border:2.5px solid rgba(255,255,255,0.9); display:flex; align-items:center; justify-content:center; }
+        .hpin .pi { transform:rotate(45deg); font-size:13px; line-height:1; }
+        .hpin-c { background:#FF1744; box-shadow:0 0 0 3px rgba(255,23,68,0.22), 0 3px 16px rgba(255,23,68,0.6); }
+        .hpin-h { background:#FF3D00; box-shadow:0 0 0 3px rgba(255,61,0,0.2),  0 3px 14px rgba(255,61,0,0.6); }
+        .hpin-m { background:#CC9000; box-shadow:0 0 0 3px rgba(204,144,0,0.2), 0 3px 12px rgba(204,144,0,0.5); }
+        .hpin-l { background:#00A846; box-shadow:0 0 0 3px rgba(0,168,70,0.2),  0 3px 10px rgba(0,168,70,0.5); }
+    </style>
+</head>
+<body>
+
+<!-- NAV -->
+<div id="nav">
+    <div class="nav-logo">SafeRoute</div>
+    <div class="nav-links">
+        <a class="nav-link" href="index.html">Home</a>
+        <a class="nav-link active">🗺️ Live Map</a>
+        <a class="nav-link" href="report.html">Report</a>
+        <a class="nav-link" href="dashboard.html">Dashboard</a>
+        <a class="nav-link" href="#" onclick="logout();return false;" style="color:rgba(255,61,0,0.7)">Logout</a>
+    </div>
+    <div class="user-pill" id="userPill">👤 User</div>
+</div>
+
+<!-- LAYOUT -->
+<div id="layout">
+
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+        <div class="sb-head">
+            <span class="sb-title">⚠️ Active Hazards</span>
+            <span class="live-pill"><span class="live-dot"></span>LIVE</span>
+        </div>
+        <div class="filter-bar">
+            <div class="filter-lbl">Filter by type</div>
+            <div class="chips">
+                <button class="chip on"  onclick="setFilter('all',this)">All</button>
+                <button class="chip"     onclick="setFilter('accident',this)">💥 Accident</button>
+                <button class="chip"     onclick="setFilter('congestion',this)">🚦 Traffic</button>
+                <button class="chip"     onclick="setFilter('roadwork',this)">🔧 Roadwork</button>
+                <button class="chip"     onclick="setFilter('pothole',this)">🕳️ Pothole</button>
+                <button class="chip"     onclick="setFilter('weather',this)">🌧️ Weather</button>
+            </div>
+        </div>
+        <div id="hazardList"></div>
+        <div class="stats-row">
+            <div class="stat-m">
+                <div class="stat-n" id="cntActive" style="color:var(--primary)">—</div>
+                <div class="stat-l">Active</div>
+            </div>
+            <div class="stat-m">
+                <div class="stat-n" id="cntCrit" style="color:#FF1744">—</div>
+                <div class="stat-l">Critical</div>
+            </div>
+            <div class="stat-m">
+                <div class="stat-n" id="cntResolved" style="color:var(--success)">—</div>
+                <div class="stat-l">Resolved</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAP -->
+    <div id="mapWrap">
+        <div id="mapLoader">
+            <div class="spin"></div>
+            <div>Connecting to live map…</div>
+        </div>
+        <div id="map"></div>
+        <div class="mcontrols">
+            <button class="mbtn" title="My Location" onclick="locateMe()">📍</button>
+            <button class="mbtn" title="Refresh"     onclick="doRefresh()">🔄</button>
+            <button class="mbtn" title="Reset view"  onclick="resetView()">🎯</button>
+        </div>
+        <a href="report.html" class="fab">⚠️ Report Hazard</a>
+    </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="auth.js"></script>
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════
+   AUTH
+═══════════════════════════════════════ */
+if (!requireAuth()) { /* redirected to login */ }
+
+document.addEventListener('DOMContentLoaded', function() {
+    var u = getUser();
+    var pill = document.getElementById('userPill');
+    if (pill && u) {
+        pill.textContent = u.name || u.email;
+    }
+});
+
+/* ═══════════════════════════════════════
+   CONSTANTS
+═══════════════════════════════════════ */
+var SEV = {
+    critical: { cls: 'hpin-c', badge: 'sc' },
+    high:     { cls: 'hpin-h', badge: 'sh' },
+    medium:   { cls: 'hpin-m', badge: 'sm' },
+    low:      { cls: 'hpin-l', badge: 'sl' }
+};
+
+/* ═══════════════════════════════════════
+   STATE
+═══════════════════════════════════════ */
+var map       = null;
+var markers   = {};     // id → L.marker
+var circles   = [];     // critical pulse circles
+var HAZARDS   = [];
+var curFilter = 'all';
+var loaderHidden = false;
+
+/* ═══════════════════════════════════════
+   BOOT — wait for full paint before init
+═══════════════════════════════════════ */
+window.addEventListener('load', function() {
+    // Double rAF ensures browser has completed layout
+    requestAnimationFrame(function() {
+        requestAnimationFrame(initMap);
+    });
+});
+
+window.addEventListener('resize', function() {
+    if (map) map.invalidateSize();
+});
+
+function initMap() {
+    var el = document.getElementById('map');
+    if (!el) { console.error('FATAL: #map element not found'); return; }
+
+    // Create map
+    map = L.map('map', {
+        center: [17.4399, 78.4983],
+        zoom: 12,
+        zoomControl: false
+    });
+
+    // Dark tile layer — CartoDB Dark Matter
+    var tileLayer = L.tileLayer(
+        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }
+    );
+
+    // Hide loader as soon as first tile loads
+    tileLayer.on('tileload', hideLoader);
+
+    tileLayer.addTo(map);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // Force Leaflet to know its dimensions (critical!)
+    setTimeout(function() { map.invalidateSize(true); }, 100);
+    setTimeout(function() { map.invalidateSize(true); }, 500);
+    // Fallback: hide loader after 5s regardless
+    setTimeout(hideLoader, 5000);
+
+    // Load data
+    fetchHazards();
+    setInterval(fetchHazards, 30000);
+
+    if (new URLSearchParams(window.location.search).get('newReport') === 'true') {
+        setTimeout(function() { toast('✅ Your report is now live!'); }, 1200);
+    }
+}
+
+function hideLoader() {
+    if (loaderHidden) return;
+    loaderHidden = true;
+    var loader = document.getElementById('mapLoader');
+    if (loader) {
+        loader.style.transition = 'opacity 0.4s';
+        loader.style.opacity = '0';
+        setTimeout(function() { loader.style.display = 'none'; }, 400);
+    }
+}
+
+/* ═══════════════════════════════════════
+   DATA FETCHING
+═══════════════════════════════════════ */
+async function fetchHazards() {
+    try {
+        var res = await authFetch(API + '/hazards?limit=100');
+        if (!res) return; // 401 handled by authFetch
+
+        var json = await res.json();
+        if (!json.success) {
+            toast('❌ ' + (json.error || 'Failed to load hazards'));
+            showEmptySidebar('Server error. Pull to refresh.');
+            return;
+        }
+
+        // Map to clean local format
+        HAZARDS = (json.data.hazards || []).map(function(h) {
+            return {
+                id:       h.hazardId,
+                type:     h.type     || 'other',
+                icon:     h.icon     || '❗',
+                sev:      h.severity || 'low',
+                lat:      parseFloat(h.lat),
+                lng:      parseFloat(h.lng),
+                loc:      h.location    || 'Unknown location',
+                desc:     h.description || '',
+                status:   h.status   || 'pending',
+                verified: h.verified || false,
+                age:      getTimeAgo(h.createdAt)
+            };
+        });
+
+        // Fetch resolved count for stats
+        fetchResolvedCount();
+
+        renderMap();
+
+    } catch (err) {
+        console.error('fetchHazards error:', err);
+        toast('❌ Cannot reach server — is node server.js running?');
+        showEmptySidebar('Could not connect. Check that server is running.');
+    }
+}
+
+async function fetchResolvedCount() {
+    try {
+        var res = await authFetch(API + '/hazards?status=resolved&limit=1');
+        if (!res) return;
+        var json = await res.json();
+        if (json.success) {
+            var el = document.getElementById('cntResolved');
+            if (el) el.textContent = json.data.total || 0;
+        }
+    } catch (e) { /* non-critical */ }
+}
+
+/* ═══════════════════════════════════════
+   MAP RENDERING
+═══════════════════════════════════════ */
+function renderMap() {
+    // Clear existing markers
+    Object.keys(markers).forEach(function(id) {
+        map.removeLayer(markers[id]);
+    });
+    markers = {};
+
+    // Clear critical circles
+    circles.forEach(function(c) { map.removeLayer(c); });
+    circles = [];
+
+    // Filter
+    var visible = curFilter === 'all'
+        ? HAZARDS
+        : HAZARDS.filter(function(h) { return h.type === curFilter; });
+
+    var active = visible.filter(function(h) { return h.status === 'active'; });
+
+    if (!visible.length) {
+        showEmptySidebar(curFilter === 'all'
+            ? 'No hazards in database yet.'
+            : 'No ' + curFilter + ' hazards right now.');
+        updateStats(active);
+        return;
+    }
+
+    // Place markers
+    visible.forEach(function(h) {
+        var cfg = SEV[h.sev] || SEV.low;
+
+        var icon = L.divIcon({
+            className: '',
+            html: '<div class="hpin ' + cfg.cls + '"><span class="pi">' + h.icon + '</span></div>',
+            iconSize:    [32, 32],
+            iconAnchor:  [16, 32],
+            popupAnchor: [0, -36]
+        });
+
+        var marker = L.marker([h.lat, h.lng], { icon: icon })
+            .bindPopup(buildPopup(h), { maxWidth: 270, className: '' })
+            .addTo(map);
+
+        // Store id on marker for click handler — use closure
+        (function(hazardId) {
+            marker.on('click', function() { highlightCard(hazardId); });
+        })(h.id);
+
+        markers[h.id] = marker;
+
+        // Critical pulse ring
+        if (h.sev === 'critical' && h.status === 'active') {
+            var circle = L.circle([h.lat, h.lng], {
+                radius: 350, color: '#FF1744', fillColor: '#FF1744',
+                fillOpacity: 0.06, weight: 1.5, opacity: 0.5
+            }).addTo(map);
+            circles.push(circle);
+        }
+    });
+
+    buildSidebar(visible);
+    updateStats(active);
+    map.invalidateSize();
+
+    toast('🗺️ ' + visible.length + ' hazard' + (visible.length !== 1 ? 's' : '') + ' loaded');
+}
+
+/* ═══════════════════════════════════════
+   POPUP HTML
+═══════════════════════════════════════ */
+function buildPopup(h) {
+    var cfg    = SEV[h.sev] || SEV.low;
+    var status = h.status === 'active'   ? '<span style="color:#FF3D00">● Active</span>'
+               : h.status === 'resolved' ? '<span style="color:#00E676">✓ Resolved</span>'
+               : '<span style="opacity:0.5">⏳ Pending</span>';
+
+    return '<div class="pbox">'
+        + '<div class="pbox-head">'
+        +   '<span class="pbox-icon">' + h.icon + '</span>'
+        +   '<span class="pbox-type">' + h.type + '</span>'
+        + '</div>'
+        + '<span class="pbox-sev ' + cfg.badge + '">' + h.sev.toUpperCase() + '</span> '
+        + status
+        + '<div class="pbox-loc">📍 ' + h.loc + '</div>'
+        + '<div class="pbox-desc">' + h.desc + '</div>'
+        + '<div class="pbox-foot">'
+        +   '<span class="pbox-time">⏱ ' + h.age + '</span>'
+        +   '<span class="pbox-ver">' + (h.verified ? '✓ Verified' : '⚠ Unverified') + '</span>'
+        + '</div>'
+        + '</div>';
+}
+
+/* ═══════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════ */
+function buildSidebar(data) {
+    var list  = document.getElementById('hazardList');
+    var items = [];
+
+    data.forEach(function(h) {
+        var cfg = SEV[h.sev] || SEV.low;
+        // Use data attribute instead of inline onclick with string — avoids quote issues
+        items.push(
+            '<div class="hcard" id="card-' + h.id + '" data-hid="' + h.id + '">'
+            + '<div class="hcard-top">'
+            +   '<span class="hcard-type">' + h.icon + ' ' + cap(h.type) + '</span>'
+            +   '<span class="sbadge ' + cfg.badge + '">' + h.sev + '</span>'
+            + '</div>'
+            + '<div class="hcard-loc">📍 ' + h.loc + '</div>'
+            + '<div class="hcard-time">⏱ ' + h.age + (h.verified ? ' · ✓ Verified' : '') + '</div>'
+            + '</div>'
+        );
+    });
+
+    list.innerHTML = items.join('');
+
+    // Attach click listeners via event delegation — NO inline onclick strings needed
+    list.querySelectorAll('.hcard').forEach(function(card) {
+        card.addEventListener('click', function() {
+            focusMarker(this.getAttribute('data-hid'));
+        });
+    });
+}
+
+function showEmptySidebar(msg) {
+    var list = document.getElementById('hazardList');
+    list.innerHTML =
+        '<div style="text-align:center;padding:3rem 1rem;opacity:0.4">'
+        + '<div style="font-size:2.5rem;margin-bottom:0.6rem">🗺️</div>'
+        + '<div style="font-size:0.85rem;font-weight:700;margin-bottom:0.3rem">No hazards found</div>'
+        + '<div style="font-size:0.75rem;opacity:0.7">' + (msg || '') + '</div>'
+        + '</div>';
+}
+
+function updateStats(active) {
+    var cntA = document.getElementById('cntActive');
+    var cntC = document.getElementById('cntCrit');
+    if (cntA) cntA.textContent = active.length;
+    if (cntC) cntC.textContent = active.filter(function(h) { return h.sev === 'critical'; }).length;
+}
+
+/* ═══════════════════════════════════════
+   INTERACTIONS
+═══════════════════════════════════════ */
+function focusMarker(id) {
+    var h = HAZARDS.find(function(x) { return x.id === id; });
+    if (!h || !map) return;
+    map.flyTo([h.lat, h.lng], 15, { animate: true, duration: 0.8 });
+    setTimeout(function() {
+        if (markers[id]) markers[id].openPopup();
+    }, 850);
+    highlightCard(id);
+}
+
+function highlightCard(id) {
+    document.querySelectorAll('.hcard').forEach(function(c) { c.classList.remove('hl'); });
+    var card = document.getElementById('card-' + id);
+    if (card) {
+        card.classList.add('hl');
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+function setFilter(type, btn) {
+    document.querySelectorAll('.chip').forEach(function(c) { c.classList.remove('on'); });
+    btn.classList.add('on');
+    curFilter = type;
+    renderMap();
+}
+
+function locateMe() {
+    if (!navigator.geolocation) { toast('❌ Geolocation not supported'); return; }
+    toast('🔄 Getting your location…');
+    navigator.geolocation.getCurrentPosition(
+        function(pos) {
+            var lat = pos.coords.latitude, lng = pos.coords.longitude;
+            map.flyTo([lat, lng], 15);
+            L.circleMarker([lat, lng], {
+                radius: 9, color: '#00E5FF', fillColor: '#00E5FF', fillOpacity: 0.4, weight: 2
+            }).addTo(map).bindPopup('📍 You are here').openPopup();
+            toast('📍 Location found!');
+        },
+        function() { toast('❌ Could not get location'); }
+    );
+}
+
+function doRefresh() {
+    toast('🔄 Refreshing…');
+    loaderHidden = false;
+    fetchHazards();
+}
+
+function resetView() {
+    if (map) map.setView([17.4399, 78.4983], 12);
+}
+
+/* ═══════════════════════════════════════
+   TOAST
+═══════════════════════════════════════ */
+var _toastTimer;
+function toast(msg) {
+    clearTimeout(_toastTimer);
+    var old = document.querySelector('.toast');
+    if (old) old.remove();
+    var t  = document.createElement('div');
+    t.className   = 'toast';
+    t.textContent = msg;
+    var wrap = document.getElementById('mapWrap');
+    if (wrap) wrap.appendChild(t);
+    _toastTimer = setTimeout(function() { if (t.parentNode) t.remove(); }, 3500);
+}
+
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+</script>
+</body>
+</html>

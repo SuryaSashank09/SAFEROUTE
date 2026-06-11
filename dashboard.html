@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRoute — Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #FF3D00; --secondary: #00E5FF; --dark: #0A0E27;
+            --darker: #050815; --light: #F0F4F8; --accent-yellow: #FFD600;
+            --accent-purple: #7C4DFF; --success: #00E676; --warning: #FFD600;
+            --critical: #FF1744; --sidebar-w: 220px;
+        }
+        body { font-family: 'Syne', sans-serif; background: var(--darker); color: var(--light); display: flex; height: 100vh; overflow: hidden; }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: var(--sidebar-w); background: rgba(10,14,39,0.99);
+            border-right: 1px solid rgba(255,61,0,0.12);
+            display: flex; flex-direction: column; flex-shrink: 0;
+            padding: 0; overflow: hidden;
+        }
+        .sidebar-brand {
+            padding: 1.3rem 1.2rem; border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .logo { font-family:'Orbitron',sans-serif; font-size:1.2rem; font-weight:900; background:linear-gradient(135deg,var(--primary),var(--accent-yellow));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text; }
+        .logo-sub { font-size:0.68rem; opacity:0.4; margin-top:0.15rem; }
+
+        .nav-section { padding: 1rem 0.8rem 0.3rem; }
+        .nav-section-label { font-size:0.67rem; opacity:0.35; text-transform:uppercase; letter-spacing:1px; padding:0 0.4rem; margin-bottom:0.4rem; }
+        .nav-item {
+            display: flex; align-items: center; gap: 0.7rem;
+            padding: 0.6rem 0.8rem; border-radius: 8px;
+            cursor: pointer; transition: all 0.2s; font-size: 0.85rem;
+            color: rgba(255,255,255,0.55); font-weight: 600; text-decoration: none;
+            margin-bottom: 0.15rem;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.9); }
+        .nav-item.active { background: rgba(255,61,0,0.15); color: var(--primary); }
+        .nav-item .badge {
+            margin-left: auto; font-size: 0.7rem; background: var(--primary);
+            color: white; padding: 0.1rem 0.4rem; border-radius: 10px; font-weight: 700;
+        }
+
+        .sidebar-bottom {
+            margin-top: auto; padding: 1rem; border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .user-mini { display:flex;align-items:center;gap:0.7rem; }
+        .user-avatar {
+            width:34px;height:34px;border-radius:50%;
+            background:linear-gradient(135deg,var(--primary),var(--accent-purple));
+            display:flex;align-items:center;justify-content:center;font-size:0.9rem;flex-shrink:0;
+        }
+        .user-info .name { font-size:0.83rem; font-weight:700; }
+        .user-info .role { font-size:0.72rem; opacity:0.45; }
+
+        /* MAIN */
+        .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+        /* TOP BAR */
+        .topbar {
+            height:60px; display:flex; align-items:center;
+            justify-content:space-between; padding:0 1.5rem;
+            background:rgba(10,14,39,0.97); border-bottom:1px solid rgba(255,255,255,0.05);
+            flex-shrink:0;
+        }
+        .topbar-title { font-size:1rem; font-weight:700; }
+        .topbar-title span { opacity:0.4; font-size:0.85rem; font-weight:400; margin-left:0.4rem; }
+        .topbar-right { display:flex; align-items:center; gap:0.75rem; }
+        .notif-btn { position:relative; cursor:pointer; font-size:1.1rem; opacity:0.7; transition:opacity 0.2s; }
+        .notif-btn:hover { opacity:1; }
+        .notif-dot { position:absolute; top:-2px; right:-2px; width:8px;height:8px;border-radius:50%; background:var(--primary); border:2px solid var(--darker); }
+        .btn-action {
+            padding:0.4rem 0.9rem; border-radius:7px; font-family:'Syne',sans-serif;
+            font-size:0.82rem; font-weight:700; cursor:pointer; transition:all 0.2s;
+        }
+        .btn-outline-sm { background:transparent; border:1px solid rgba(255,255,255,0.15); color:var(--light); }
+        .btn-primary-sm { background:var(--primary); border:none; color:white; box-shadow:0 4px 15px rgba(255,61,0,0.3); }
+        .btn-action:hover { opacity:0.85; }
+
+        /* CONTENT */
+        .content { flex:1; overflow-y:auto; padding:1.5rem; }
+        .content::-webkit-scrollbar { width:5px; }
+        .content::-webkit-scrollbar-track { background:transparent; }
+        .content::-webkit-scrollbar-thumb { background:rgba(255,61,0,0.25); border-radius:3px; }
+
+        /* METRIC CARDS */
+        .metrics-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.5rem; }
+        .metric-card {
+            background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07);
+            border-radius:14px; padding:1.2rem; position:relative; overflow:hidden;
+            transition:border-color 0.2s;
+        }
+        .metric-card:hover { border-color:rgba(255,61,0,0.25); }
+        .metric-card::before {
+            content:''; position:absolute; top:0;left:0; right:0; height:2px;
+        }
+        .mc-primary::before { background:var(--primary); }
+        .mc-critical::before { background:var(--critical); }
+        .mc-yellow::before { background:var(--accent-yellow); }
+        .mc-success::before { background:var(--success); }
+        .metric-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.8rem; }
+        .metric-icon { font-size:1.3rem; }
+        .metric-trend { font-size:0.73rem; font-weight:700; padding:0.2rem 0.4rem; border-radius:5px; }
+        .trend-up { background:rgba(255,61,0,0.15); color:var(--primary); }
+        .trend-down { background:rgba(0,230,118,0.15); color:var(--success); }
+        .metric-num { font-family:'Orbitron',sans-serif; font-size:2rem; font-weight:700; margin-bottom:0.2rem; }
+        .metric-lbl { font-size:0.8rem; opacity:0.45; }
+        .metric-sub { font-size:0.75rem; opacity:0.35; margin-top:0.3rem; }
+
+        /* CHARTS ROW */
+        .charts-row { display:grid; grid-template-columns:2fr 1fr; gap:1rem; margin-bottom:1.5rem; }
+        .chart-card { background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:1.2rem; }
+        .chart-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+        .chart-title { font-size:0.85rem; font-weight:700; }
+        .chart-subtitle { font-size:0.72rem; opacity:0.4; margin-top:0.15rem; }
+        .chart-filters { display:flex; gap:0.3rem; }
+        .cf { padding:0.25rem 0.6rem; border-radius:5px; font-size:0.72rem; font-weight:600; cursor:pointer; border:none; font-family:'Syne',sans-serif; transition:all 0.2s; }
+        .cf.active { background:var(--primary); color:white; }
+        .cf:not(.active) { background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.5); }
+        .chart-wrap { height:200px; }
+
+        /* TABLE */
+        .table-section { background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:14px; overflow:hidden; }
+        .table-header { padding:1rem 1.2rem; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:space-between; }
+        .table-title { font-size:0.88rem; font-weight:700; }
+        .search-input {
+            padding:0.4rem 0.8rem; background:rgba(255,255,255,0.05);
+            border:1px solid rgba(255,255,255,0.09); border-radius:7px;
+            color:var(--light); font-family:'Syne',sans-serif; font-size:0.82rem;
+            outline:none; width:200px; transition:all 0.2s;
+        }
+        .search-input:focus { border-color:rgba(255,61,0,0.4); background:rgba(255,61,0,0.04); }
+        table { width:100%; border-collapse:collapse; }
+        thead th { padding:0.7rem 1rem; text-align:left; font-size:0.72rem; opacity:0.4; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid rgba(255,255,255,0.05); white-space:nowrap; }
+        tbody tr { transition:background 0.15s; cursor:pointer; }
+        tbody tr:hover { background:rgba(255,61,0,0.05); }
+        tbody td { padding:0.8rem 1rem; font-size:0.83rem; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:middle; }
+        tbody tr:last-child td { border-bottom:none; }
+        .td-type { display:flex; align-items:center; gap:0.5rem; font-weight:600; }
+        .td-sev { display:inline-block; padding:0.22rem 0.55rem; border-radius:5px; font-size:0.72rem; font-weight:700; text-transform:uppercase; white-space:nowrap; }
+        .s-critical { background:rgba(255,23,68,0.15); color:#FF1744; }
+        .s-high { background:rgba(255,61,0,0.15); color:var(--primary); }
+        .s-medium { background:rgba(255,214,0,0.15); color:var(--accent-yellow); }
+        .s-low { background:rgba(0,230,118,0.15); color:var(--success); }
+        .status-dot { width:7px;height:7px;border-radius:50%;display:inline-block; }
+        .st-active { background:var(--primary); box-shadow:0 0 8px var(--primary); }
+        .st-resolved { background:var(--success); }
+        .st-pending { background:var(--accent-yellow); }
+        .action-btns { display:flex; gap:0.4rem; }
+        .act-btn { padding:0.25rem 0.55rem; border-radius:5px; font-size:0.72rem; font-weight:600; border:none; cursor:pointer; font-family:'Syne',sans-serif; transition:all 0.2s; }
+        .act-resolve { background:rgba(0,230,118,0.15); color:var(--success); }
+        .act-delete { background:rgba(255,23,68,0.1); color:#FF1744; }
+        .act-btn:hover { opacity:0.75; }
+
+        /* BOTTOM ROW */
+        .bottom-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1.5rem; }
+        .mini-card { background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:1.2rem; }
+
+        /* Activity feed */
+        .activity-feed { display:flex; flex-direction:column; gap:0.6rem; margin-top:0.5rem; max-height:200px; overflow-y:auto; }
+        .activity-feed::-webkit-scrollbar { width:3px; }
+        .activity-feed::-webkit-scrollbar-thumb { background:rgba(255,61,0,0.2); }
+        .activity-item { display:flex; gap:0.75rem; align-items:flex-start; }
+        .a-icon { width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.75rem; }
+        .a-report { background:rgba(255,61,0,0.15); }
+        .a-resolved { background:rgba(0,230,118,0.15); }
+        .a-alert { background:rgba(255,214,0,0.15); }
+        .a-text { font-size:0.8rem; line-height:1.4; }
+        .a-text .a-bold { font-weight:700; }
+        .a-time { font-size:0.7rem; opacity:0.35; margin-top:0.1rem; }
+
+        /* Hotspots */
+        .hotspot-list { display:flex; flex-direction:column; gap:0.6rem; margin-top:0.5rem; }
+        .hotspot-item { display:flex; align-items:center; gap:0.75rem; }
+        .hotspot-rank { font-family:'Orbitron',sans-serif; font-size:0.85rem; font-weight:700; opacity:0.3; width:20px; }
+        .hotspot-info { flex:1; }
+        .hotspot-name { font-size:0.82rem; font-weight:600; }
+        .hotspot-count { font-size:0.72rem; opacity:0.45; }
+        .hotspot-bar-wrap { width:80px; height:5px; background:rgba(255,255,255,0.08); border-radius:3px; }
+        .hotspot-bar { height:100%; border-radius:3px; background:var(--primary); }
+
+        @media(max-width:900px) { .metrics-grid{grid-template-columns:repeat(2,1fr);} .charts-row{grid-template-columns:1fr;} .bottom-row{grid-template-columns:1fr;} }
+    </style>
+</head>
+<body>
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="sidebar-brand">
+            <div class="logo">SafeRoute</div>
+            <div class="logo-sub">Admin Dashboard</div>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-label">Main</div>
+            <a class="nav-item active" href="dashboard.html">📊 Overview</a>
+            <a class="nav-item" href="map.html">🗺️ Live Map</a>
+            <a class="nav-item" href="#">📋 All Reports </a>
+            <a class="nav-item" href="#">📍 Hotspots</a>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-label">Management</div>
+            <a class="nav-item" href="#">👥 Users</a>
+            <a class="nav-item" href="#">🔔 Alerts</a>
+            <a class="nav-item" href="#">📈 Analytics</a>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-label">System</div>
+            <a class="nav-item" href="#">⚙️ Settings</a>
+            <a class="nav-item" href="#" onclick="logout();return false;">🔒 Logout</a>
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="user-mini">
+                <div class="user-avatar">👤</div>
+                <div class="user-info">
+                    <div class="name">Admin</div>
+                    <div class="role">Super Admin · GCET</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN AREA -->
+    <div class="main">
+        <!-- TOPBAR -->
+        <div class="topbar">
+            <div>
+                <div class="topbar-title">Dashboard <span>/ Overview</span></div>
+            </div>
+            <div class="topbar-right">
+                <div class="notif-btn">🔔<span class="notif-dot"></span></div>
+                <a href="report.html" class="btn-action btn-outline-sm">+ New Report</a>
+                <button class="btn-action btn-primary-sm" onclick="exportData()">⬇ Export</button>
+            </div>
+        </div>
+
+        <!-- CONTENT -->
+        <div class="content">
+            <!-- METRICS -->
+            <div class="metrics-grid">
+                <div class="metric-card mc-primary">
+                    <div class="metric-header"><span class="metric-icon">⚠️</span><span class="metric-trend trend-up">+18%</span></div>
+                    <div class="metric-num" id="m1">247</div>
+                    <div class="metric-lbl">Total Reports</div>
+                    <div class="metric-sub">This month</div>
+                </div>
+                <div class="metric-card mc-critical">
+                    <div class="metric-header"><span class="metric-icon">🚨</span><span class="metric-trend trend-up">+5%</span></div>
+                    <div class="metric-num" id="m2" style="color:var(--critical)">12</div>
+                    <div class="metric-lbl">Critical Active</div>
+                    <div class="metric-sub">Needs immediate action</div>
+                </div>
+                <div class="metric-card mc-yellow">
+                    <div class="metric-header"><span class="metric-icon">✅</span><span class="metric-trend trend-down">+32%</span></div>
+                    <div class="metric-num" id="m3" style="color:var(--success)">189</div>
+                    <div class="metric-lbl">Resolved</div>
+                    <div class="metric-sub">Resolution rate: 76%</div>
+                </div>
+                <div class="metric-card mc-success">
+                    <div class="metric-header"><span class="metric-icon">👥</span><span class="metric-trend trend-up">+8%</span></div>
+                    <div class="metric-num" id="m4">1,340</div>
+                    <div class="metric-lbl">Active Users</div>
+                    <div class="metric-sub">+124 this week</div>
+                </div>
+            </div>
+
+            <!-- CHARTS -->
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Reports Over Time</div>
+                            <div class="chart-subtitle">Daily hazard report volume</div>
+                        </div>
+                        <div class="chart-filters">
+                            <button class="cf active">7D</button>
+                            <button class="cf">30D</button>
+                            <button class="cf">90D</button>
+                        </div>
+                    </div>
+                    <div class="chart-wrap"><canvas id="lineChart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">By Hazard Type</div>
+                            <div class="chart-subtitle">Distribution this month</div>
+                        </div>
+                    </div>
+                    <div class="chart-wrap"><canvas id="doughnutChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- TABLE -->
+            <div class="table-section">
+                <div class="table-header">
+                    <div class="table-title">Recent Hazard Reports</div>
+                    <input class="search-input" placeholder="🔍 Search reports..." oninput="filterTable(this.value)">
+                </div>
+                <table id="reportsTable">
+                    <thead>
+                        <tr>
+                            <th>#ID</th>
+                            <th>Type</th>
+                            <th>Severity</th>
+                            <th>Location</th>
+                            <th>Reporter</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+
+            <!-- BOTTOM ROW -->
+            <div class="bottom-row">
+                <!-- Activity Feed -->
+                <div class="mini-card">
+                    <div class="chart-header">
+                        <div class="chart-title">Live Activity Feed</div>
+                        <div style="font-size:0.72rem;color:var(--success);display:flex;align-items:center;gap:0.3rem"><span style="width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block;animation:pulse 1.5s infinite"></span>LIVE</div>
+                    </div>
+                    <div class="activity-feed" id="activityFeed"></div>
+                </div>
+
+                <!-- Hotspots -->
+                <div class="mini-card">
+                    <div class="chart-header">
+                        <div class="chart-title">Top Hazard Hotspots</div>
+                        <div style="font-size:0.72rem;opacity:0.4">This month</div>
+                    </div>
+                    <div class="hotspot-list" id="hotspotList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <script src="auth.js"></script>
+    <script>
+        /* ── Auth Guard ── */
+        // All logged-in users can access dashboard (read-only for regular users)
+        if (!requireAuth()) { /* redirected to login */ }
+        const _currentUser = getUser();
+        const _isAdmin = _currentUser && (_currentUser.role === 'admin' || _currentUser.role === 'authority');
+
+        /* ── Populate sidebar user ── */
+        document.addEventListener('DOMContentLoaded', () => {
+            populateNavUser('.user-info .name', '.user-info .role');
+        });
+
+        /* ── API helpers ── */
+        async function apiGet(path) {
+            const res = await authFetch(API + path);
+            if (!res) return null;
+            return res.json();
+        }
+        async function apiPatch(path, body) {
+            const res = await authFetch(API + path, { method:'PATCH', body:JSON.stringify(body) });
+            if (!res) return null;
+            return res.json();
+        }
+        async function apiDeleteReq(path) {
+            const res = await authFetch(API + path, { method:'DELETE' });
+            if (!res) return null;
+            return res.json();
+        }
+
+        /* ── State ── */
+        let allReports = [];
+        let lineChartInst, doughnutChartInst;
+
+        /* ── Load everything ── */
+        async function loadDashboard() {
+            showLoadingState();
+            try {
+                const user = getUser();
+                const isAdmin = user && (user.role === 'admin' || user.role === 'authority');
+
+                // All users fetch hazards; admins also get analytics
+                const requests = [apiGet('/hazards?limit=100')];
+                if (isAdmin) {
+                    requests.push(
+                        apiGet('/analytics/summary'),
+                        apiGet('/analytics/hotspots'),
+                        apiGet('/analytics/trends?days=7')
+                    );
+                }
+
+                const results = await Promise.all(requests);
+                const hazardsRes = results[0];
+                const summaryRes = results[1];
+                const hotspotsRes = results[2];
+                const trendsRes  = results[3];
+
+                if (hazardsRes?.success) {
+                    allReports = hazardsRes.data.hazards || [];
+                } else {
+                    allReports = [];
+                }
+
+                // For regular users: filter to only their own reports
+                if (!isAdmin && user) {
+                    const myReports = allReports.filter(r => r.reporterName === user.name);
+                    renderTable(myReports, user.name);
+                    renderUserStats(myReports, allReports.length);
+                } else {
+                    renderTable(allReports, null);
+                    if (summaryRes?.success)  renderSummary(summaryRes.data);
+                    if (hotspotsRes?.success) renderHotspots(hotspotsRes.data.hotspots);
+                    if (trendsRes?.success)   renderLineChart(trendsRes.data.trend);
+                    if (summaryRes?.success)  renderDoughnut(summaryRes.data.byType);
+                    if (summaryRes?.success)  renderActivity(summaryRes.data.recentActivity);
+                }
+
+            } catch(err) {
+                console.error('Dashboard load error:', err);
+                allReports = [];
+                renderTable([], null);
+                showGlobalToast('Could not load dashboard data. Is the server running?', 'error');
+            }
+        }
+
+        function renderUserStats(myReports, totalGlobal) {
+            // Show simplified stats for regular users
+            animateNum('m1', myReports.length);
+            animateNum('m2', myReports.filter(r => r.severity === 'critical').length);
+            animateNum('m3', myReports.filter(r => r.status === 'resolved').length);
+
+            // Update KPI labels for user context
+            const labels = document.querySelectorAll('.metric-label');
+            if (labels[0]) labels[0].textContent = 'My Reports';
+            if (labels[1]) labels[1].textContent = 'My Critical';
+            if (labels[2]) labels[2].textContent = 'My Resolved';
+
+            // Show simple message instead of charts for users
+            const chartArea = document.querySelector('.charts-row, .chart-row, [class*="chart"]');
+            if (chartArea) {
+                chartArea.innerHTML =
+                    '<div style="grid-column:1/-1;text-align:center;padding:2rem;opacity:0.5;font-size:0.85rem">' +
+                    '📊 Full analytics available for Admin and Authority accounts.</div>';
+            }
+        }
+
+        function showLoadingState() {
+            const tbody = document.getElementById('tableBody');
+            if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;opacity:0.4">⏳ Loading reports from database…</td></tr>';
+        }
+
+        /* ── Summary KPIs ── */
+        function renderSummary(data) {
+            const s = data.summary || {};
+            animateNum('m1', s.totalReports   || 0);
+            animateNum('m2', s.criticalActive  || 0);
+            animateNum('m3', s.resolvedHazards || 0);
+        }
+
+        /* ── Line chart ── */
+        function renderLineChart(trend) {
+            const canvas = document.getElementById('lineChart');
+            if (!canvas || !trend?.length) return;
+            if (lineChartInst) lineChartInst.destroy();
+            lineChartInst = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: trend.map(t => t.label),
+                    datasets: [{
+                        label: 'Reports',
+                        data: trend.map(t => t.count),
+                        borderColor: '#FF3D00',
+                        backgroundColor: 'rgba(255,61,0,0.08)',
+                        tension: 0.4, fill: true,
+                        pointBackgroundColor: '#FF3D00', pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color:'rgba(240,244,248,0.7)', font:{family:'Syne',size:11} } } },
+                    scales: {
+                        x: { grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'rgba(240,244,248,0.4)',font:{family:'Syne',size:11}} },
+                        y: { grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'rgba(240,244,248,0.4)',font:{family:'Syne',size:11}}, beginAtZero:true }
+                    }
+                }
+            });
+        }
+
+        /* ── Doughnut chart ── */
+        function renderDoughnut(byType) {
+            const canvas = document.getElementById('doughnutChart');
+            if (!canvas || !byType) return;
+            if (doughnutChartInst) doughnutChartInst.destroy();
+            const labels = Object.keys(byType);
+            const values = Object.values(byType);
+            if (!values.some(v => v > 0)) return;
+            doughnutChartInst = new Chart(canvas.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{ data: values,
+                        backgroundColor:['#FF1744','#FF3D00','#FFD600','#7C4DFF','#00E5FF','#00E676'],
+                        borderWidth: 0, hoverOffset: 5 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '68%',
+                    plugins: { legend: { position:'right', labels:{color:'rgba(240,244,248,0.7)',font:{family:'Syne',size:11},padding:10} } }
+                }
+            });
+        }
+
+        /* ── Table ── */
+        const ICONS = { accident:'💥', congestion:'🚦', roadwork:'🔧', pothole:'🕳️', weather:'🌧️', other:'❗' };
+        const SEV   = { critical:'s-critical', high:'s-high', medium:'s-medium', low:'s-low' };
+        const STAT  = {
+            active:   '<span class="status-dot st-active"></span> Active',
+            resolved: '<span class="status-dot st-resolved"></span> Resolved',
+            pending:  '<span class="status-dot st-pending"></span> Pending'
+        };
+
+        function renderTable(data, forUserName) {
+            const tbody = document.getElementById('tableBody');
+            if (!tbody) return;
+
+            /* ── Empty state ── */
+            if (!data || !data.length) {
+                const emptyMsg = forUserName
+                    ? 'You have not submitted any hazard reports yet.'
+                    : 'No reports in the database yet.';
+                const emptyHint = forUserName
+                    ? 'Go to <a href="report.html" style="color:#FF3D00;text-decoration:none">Report Hazard</a> to submit your first report.'
+                    : 'Reports submitted by users will appear here.';
+                tbody.innerHTML =
+                    '<tr><td colspan="8">' +
+                    '<div style="text-align:center;padding:3.5rem 1rem;opacity:0.5">' +
+                    '<div style="font-size:3rem;margin-bottom:0.8rem">📭</div>' +
+                    '<div style="font-size:0.95rem;font-weight:700;margin-bottom:0.4rem">No data yet</div>' +
+                    '<div style="font-size:0.82rem;opacity:0.7;margin-bottom:0.3rem">' + emptyMsg + '</div>' +
+                    '<div style="font-size:0.78rem;opacity:0.55">' + emptyHint + '</div>' +
+                    '</div></td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(r => `
+                <tr>
+                    <td style="font-family:'Space Mono';font-size:0.75rem;opacity:0.5">${r.hazardId || '—'}</td>
+                    <td><div class="td-type">${ICONS[r.type]||'❗'} ${cap(r.type)}</div></td>
+                    <td><span class="td-sev ${SEV[r.severity]||''}">${r.severity}</span></td>
+                    <td style="opacity:0.75;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.location}">${r.location}</td>
+                    <td style="opacity:0.65">${r.reporterName||'—'}</td>
+                    <td style="opacity:0.45;font-size:0.78rem">${getTimeAgo(r.createdAt)}</td>
+                    <td><div style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem">${STAT[r.status]||r.status}</div></td>
+                    <td><div class="action-btns">
+                        ${r.status !== 'resolved'
+                            ? (_isAdmin ? `<button class="act-btn act-resolve" onclick="resolveReport('${r.hazardId}')">Resolve</button>` : '<span style="opacity:0.25;font-size:0.72rem">Active</span>')
+                            : '<span style="opacity:0.25;font-size:0.72rem">Done</span>'}
+                        ${_isAdmin ? `<button class="act-btn act-delete" onclick="deleteReport('${r.hazardId}')">Delete</button>` : ''}
+                    </div></td>
+                </tr>`).join('');
+        }
+
+        function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+
+        function filterTable(q) {
+            const needle = q.toLowerCase();
+            renderTable(allReports.filter(r =>
+                [r.hazardId, r.type, r.severity, r.location, r.reporterName, r.status]
+                .some(v => String(v||'').toLowerCase().includes(needle))
+            ));
+        }
+
+        async function resolveReport(hazardId) {
+            const data = await apiPatch('/hazards/' + hazardId + '/status', { status:'resolved' });
+            if (!data) return;
+            if (data.success) {
+                const r = allReports.find(x => x.hazardId === hazardId);
+                if (r) r.status = 'resolved';
+                renderTable(allReports);
+                addActivity('resolved', hazardId + ' marked resolved');
+                showGlobalToast(hazardId + ' resolved', 'success');
+            } else { showGlobalToast(data.error, 'error'); }
+        }
+
+        async function deleteReport(hazardId) {
+            if (!confirm('Permanently delete ' + hazardId + '?')) return;
+            const data = await apiDeleteReq('/hazards/' + hazardId);
+            if (!data) return;
+            if (data.success) {
+                allReports = allReports.filter(x => x.hazardId !== hazardId);
+                renderTable(allReports);
+                addActivity('alert', hazardId + ' deleted');
+                showGlobalToast(hazardId + ' deleted', 'warn');
+            } else { showGlobalToast(data.error, 'error'); }
+        }
+
+        /* ── Activity feed ── */
+        function renderActivity(recent) {
+            const feed = document.getElementById('activityFeed');
+            if (!feed) return;
+            if (!recent?.length) {
+                feed.innerHTML = '<div style="text-align:center;padding:1.5rem;opacity:0.35;font-size:0.82rem">No recent activity</div>';
+                return;
+            }
+            feed.innerHTML = recent.map(h => `
+                <div class="activity-item">
+                    <div class="a-icon a-report">${ICONS[h.type]||'⚠️'}</div>
+                    <div>
+                        <div class="a-text"><span class="a-bold">${h.hazardId}</span> — ${h.location}</div>
+                        <div class="a-time">${getTimeAgo(h.createdAt)}</div>
+                    </div>
+                </div>`).join('');
+        }
+
+        function addActivity(type, text) {
+            const feed = document.getElementById('activityFeed');
+            if (!feed) return;
+            const icons = { resolved:'✅', report:'⚠️', alert:'🔔' };
+            const cls   = { resolved:'a-resolved', report:'a-report', alert:'a-alert' };
+            const item  = document.createElement('div');
+            item.className = 'activity-item';
+            item.innerHTML = `<div class="a-icon ${cls[type]}">${icons[type]}</div>
+                <div><div class="a-text">${text}</div><div class="a-time">Just now</div></div>`;
+            feed.insertBefore(item, feed.firstChild);
+        }
+
+        /* ── Hotspots ── */
+        function renderHotspots(hotspots) {
+            const el = document.getElementById('hotspotList');
+            if (!el) return;
+            if (!hotspots?.length) {
+                el.innerHTML = '<div style="text-align:center;padding:1rem;opacity:0.35;font-size:0.82rem">No hotspots yet</div>';
+                return;
+            }
+            const max = hotspots[0].count || 1;
+            el.innerHTML = hotspots.slice(0,5).map((h,i) => `
+                <div class="hotspot-item">
+                    <div class="hotspot-rank">${i+1}</div>
+                    <div class="hotspot-info">
+                        <div class="hotspot-name">${h.location}</div>
+                        <div class="hotspot-count">${h.count} report${h.count!==1?'s':''}</div>
+                    </div>
+                    <div class="hotspot-bar-wrap">
+                        <div class="hotspot-bar" style="width:${Math.round(h.count/max*100)}%"></div>
+                    </div>
+                </div>`).join('');
+        }
+
+        /* ── Animate counters ── */
+        function animateNum(id, target) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            let cur = 0;
+            const step = Math.max(1, Math.ceil(target / 40));
+            const iv = setInterval(() => {
+                cur = Math.min(cur + step, target);
+                el.textContent = cur.toLocaleString();
+                if (cur >= target) clearInterval(iv);
+            }, 30);
+        }
+
+        /* ── CSV Export ── */
+        function exportData() {
+            if (!allReports.length) { showGlobalToast('No data to export', 'warn'); return; }
+            const csv = [
+                'ID,Type,Severity,Location,Reporter,Status,Created',
+                ...allReports.map(r =>
+                    `${r.hazardId},${r.type},${r.severity},"${r.location}",${r.reporterName},${r.status},${r.createdAt}`)
+            ].join('\n');
+            const a = Object.assign(document.createElement('a'), {
+                href: URL.createObjectURL(new Blob([csv], {type:'text/csv'})),
+                download: `saferoute_${new Date().toISOString().split('T')[0]}.csv`
+            });
+            a.click();
+        }
+
+        /* ── Chart filter buttons ── */
+        document.querySelectorAll('.cf').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.cf').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        loadDashboard();
+    </script>
+</body>
+</html>

@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRoute - Traffic Hazard Analytics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+
+    <style>
+        /* ── HERO ANIMATION BOX ── */
+        .traffic-animation-box {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            max-width: 480px;
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 2px solid rgba(255,61,0,0.35);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.55), 0 0 40px rgba(255,61,0,0.08);
+            background: #060d1f;
+        }
+
+        #heroMapCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* ── TRAFFIC SIGNAL ── */
+        .traffic-signal {
+            position: absolute;
+            top: 14px;
+            right: 18px;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            filter: drop-shadow(0 4px 14px rgba(0,0,0,0.7));
+        }
+        .signal-housing {
+            width: 28px;
+            background: #1a1a2e;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 5px 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);
+        }
+        .signal-light {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #111;
+            border: 1px solid #222;
+            transition: all 0.4s ease;
+        }
+        #sig-red   { background: #2a0000; }
+        #sig-amber { background: #1a1200; }
+        #sig-green { background: #001a00; }
+
+        #sig-red.on   { background: #FF1744; box-shadow: 0 0 12px #FF1744, 0 0 24px rgba(255,23,68,0.6); }
+        #sig-amber.on { background: #FFD600; box-shadow: 0 0 12px #FFD600, 0 0 24px rgba(255,214,0,0.6); }
+        #sig-green.on { background: #00E676; box-shadow: 0 0 12px #00E676, 0 0 24px rgba(0,230,118,0.6); }
+
+        .signal-pole {
+            width: 3px;
+            height: 22px;
+            background: linear-gradient(to bottom, #888, #555);
+            border-radius: 2px;
+        }
+
+        /* ── STATUS LABEL ── */
+        .map-status-label {
+            position: absolute;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.3rem 0.9rem;
+            border-radius: 20px;
+            background: rgba(8,12,30,0.88);
+            border: 1px solid rgba(255,255,255,0.12);
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+            transition: all 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation">
+        <div class="grid-overlay"></div>
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+        <div class="glow-orb orb-3"></div>
+    </div>
+
+    <nav>
+        <div class="logo">SafeRoute</div>
+        <ul class="nav-links">
+            <li><a href="#home">Home</a></li>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#analytics">Analytics</a></li>
+            <li><a href="report.html">⚠️ Report Hazard</a></li>
+            <li><a href="map.html">🗺️ Live Map</a></li>
+            <li><a href="dashboard.html">📊 Dashboard</a></li>
+            <li><a href="login.html" style="color:var(--primary);font-weight:800">Login →</a></li>
+        </ul>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </nav>
+
+    <section class="hero" id="home">
+        <div class="hero-content">
+            <span class="hero-tag">🚨 Smart Traffic Management</span>
+            <h1>Traffic Hazard Reporting & Analytics</h1>
+            <p class="hero-subtitle">
+                Real-time hazard detection and intelligent hotspot analytics powered by community reports and advanced data visualization. Making roads safer, one report at a time.
+            </p>
+            <div class="cta-buttons">
+                <a href="report.html" class="btn btn-primary">Report Hazard</a>
+                <a href="map.html" class="btn btn-secondary">Live Map</a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="traffic-animation-box">
+
+                <!-- Traffic Signal -->
+                <div class="traffic-signal">
+                    <div class="signal-pole"></div>
+                    <div class="signal-housing">
+                        <div class="signal-light" id="sig-red"></div>
+                        <div class="signal-light" id="sig-amber"></div>
+                        <div class="signal-light" id="sig-green"></div>
+                    </div>
+                </div>
+
+                <!-- City Map Canvas -->
+                <canvas id="heroMapCanvas"></canvas>
+
+                <!-- Overlay label -->
+                <div class="map-status-label" id="mapStatusLabel">🔴 CRITICAL HAZARDS</div>
+
+            </div>
+        </div>
+    </section>
+
+    <section class="features" id="features">
+        <h2 class="section-title">Core Features</h2>
+        <p class="section-subtitle">Comprehensive tools for traffic monitoring and accident prevention</p>
+        
+        <div class="features-grid">
+            <div class="feature-card" data-aos="fade-up">
+                <div class="feature-icon">📍</div>
+                <h3>Real-Time Reporting</h3>
+                <p>Report traffic hazards, accidents, and road conditions instantly with geolocation tagging for precise incident mapping.</p>
+            </div>
+            
+            <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
+                <div class="feature-icon">🗺️</div>
+                <h3>Interactive Hotspot Maps</h3>
+                <p>Visualize accident-prone zones and high-risk areas on dynamic, color-coded maps with real-time data overlays.</p>
+            </div>
+            
+            <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
+                <div class="feature-icon">📊</div>
+                <h3>Advanced Analytics</h3>
+                <p>Data-driven insights identifying patterns, trends, and correlations in traffic incidents across different zones and time periods.</p>
+            </div>
+            
+            <div class="feature-card" data-aos="fade-up" data-aos-delay="300">
+                <div class="feature-icon">⚡</div>
+                <h3>Smart Alerts</h3>
+                <p>Receive instant notifications about hazards on your route with predictive warnings based on historical data.</p>
+            </div>
+            
+            <div class="feature-card" data-aos="fade-up" data-aos-delay="400">
+                <div class="feature-icon">👥</div>
+                <h3>Community-Powered</h3>
+                <p>Crowdsourced reporting system where users contribute to a safer road network through collective awareness.</p>
+            </div>
+            
+            <div class="feature-card" data-aos="fade-up" data-aos-delay="500">
+                <div class="feature-icon">📈</div>
+                <h3>Administrative Dashboard</h3>
+                <p>Comprehensive control panel for monitoring trends, generating reports, and managing traffic management initiatives.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="stats" id="analytics">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-number" data-count="24">0</div>
+                <div class="stat-label">Hours Monitoring</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" data-count="100">0</div>
+                <div class="stat-label">Data Accuracy %</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" data-count="1000">0</div>
+                <div class="stat-label">Reports Processed</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" data-count="50">0</div>
+                <div class="stat-label">Cities Covered</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="report-section" id="report">
+        <div class="report-container">
+            <h2 class="section-title">Report a Hazard</h2>
+            <p class="section-subtitle">Help make roads safer by reporting traffic incidents and hazards</p>
+            
+            <form class="report-form" id="hazardForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="hazardType">Hazard Type</label>
+                        <select id="hazardType" required>
+                            <option value="">Select type...</option>
+                            <option value="accident">Accident</option>
+                            <option value="congestion">Traffic Congestion</option>
+                            <option value="roadwork">Road Work</option>
+                            <option value="pothole">Pothole/Road Damage</option>
+                            <option value="weather">Weather Hazard</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="severity">Severity Level</label>
+                        <select id="severity" required>
+                            <option value="">Select severity...</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="location">Location</label>
+                    <input type="text" id="location" placeholder="Enter location or use current location" required>
+                    <button type="button" class="location-btn" id="getLocation">
+                        📍 Use Current Location
+                    </button>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" rows="4" placeholder="Provide details about the hazard..." required></textarea>
+                </div>
+                
+                <button type="button" class="btn btn-primary btn-submit" onclick="quickSubmit()">
+                    Submit Report
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <section class="about-section" id="about">
+        <div class="about-container">
+            <h2 class="section-title">About the Project</h2>
+            <div class="about-content">
+                <div class="about-text">
+                    <h3>Traffic Hazard Reporting & Hotspot Analytics System</h3>
+                    <p>
+                        This web-based application is designed to identify, analyze, and visualize traffic-prone zones 
+                        and accident hotspots using modern web technologies. By integrating data analytics, geolocation 
+                        services, and real-time reporting, we aim to enhance road safety and support smart city traffic 
+                        management initiatives.
+                    </p>
+                    <h4>Technologies Used</h4>
+                    <ul class="tech-list">
+                        <li>HTML5, CSS3, JavaScript</li>
+                        <li>Interactive Map Integration</li>
+                        <li>Database Management Systems</li>
+                        <li>Data Visualization Libraries</li>
+                        <li>Geolocation APIs</li>
+                        <li>Responsive Web Design</li>
+                    </ul>
+                    <div class="college-info">
+                        <p><strong>Geethanjali College of Engineering & Technology</strong></p>
+                        <p>Department of Computer Science & Engineering</p>
+                        <p>Web Technologies (20CS22004) - Project Based Learning</p>
+                        <p>Academic Year: 2025-26</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="#privacy">Privacy Policy</a>
+                <a href="#terms">Terms of Service</a>
+                <a href="#contact">Contact</a>
+                <a href="#support">Support</a>
+            </div>
+            <p class="footer-text">
+                © 2026 SafeRoute - Traffic Hazard & Hotspot Analytics System<br>
+                Geethanjali College of Engineering & Technology | Web Technologies Project
+            </p>
+        </div>
+    </footer>
+
+
+    <script src="auth.js"></script>
+    <script>
+        /* ── Update Login nav link based on session ── */
+        window.addEventListener('DOMContentLoaded', () => {
+            const token = getToken();
+            const user  = getUser();
+            const loginLink = document.querySelector('nav a[href="login.html"]');
+            if (loginLink && token && user) {
+                loginLink.textContent = '👤 ' + user.name;
+                loginLink.href = (user.role === 'admin' || user.role === 'authority')
+                    ? 'dashboard.html' : 'map.html';
+            }
+        });
+
+        /* ── Quick report form ── */
+        async function quickSubmit() {
+            const type     = document.getElementById('hazardType')?.value;
+            const severity = document.getElementById('severity')?.value;
+            const location = document.getElementById('location')?.value?.trim();
+            const desc     = document.getElementById('description')?.value?.trim();
+
+            if (!type || !severity || !location || !desc) {
+                alert('Please fill in all fields.'); return;
+            }
+            if (!getToken()) {
+                if (confirm('You need to be logged in to submit a report. Go to login?')) {
+                    window.location.href = 'login.html';
+                }
+                return;
+            }
+            try {
+                const user = getUser();
+                const res  = await authFetch(API + '/hazards', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        type, severity, location, description: desc,
+                        lat: 17.4326, lng: 78.4983,
+                        reporterName: user?.name || 'Anonymous'
+                    })
+                });
+                if (!res) return;
+                const data = await res.json();
+                if (data.success) {
+                    alert('✅ Report submitted! ID: ' + data.data.hazard.hazardId);
+                    ['hazardType','severity','location','description'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.value = '';
+                    });
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch(err) {
+                alert('Cannot reach server. Make sure node server.js is running.');
+            }
+        }
+    </script>
+
+    <script>
+    /* ════════════════════════════════════════════════
+       SafeRoute Hero Map Animation
+       Traffic signal cycles: RED → AMBER → GREEN
+       Each phase shows different hazard markers on map
+    ════════════════════════════════════════════════ */
+    (function() {
+        const canvas = document.getElementById('heroMapCanvas');
+        if (!canvas) return;
+        const ctx    = canvas.getContext('2d');
+
+        // ── Resize canvas to match CSS size ──
+        function resizeCanvas() {
+            const box = canvas.parentElement.getBoundingClientRect();
+            canvas.width  = box.width;
+            canvas.height = box.height;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', () => { resizeCanvas(); drawFrame(); });
+
+        // ── Hyderabad-like road grid ──
+        // Each road: { x1,y1,x2,y2 } as fraction of canvas size
+        const ROADS_H = [0.15, 0.32, 0.50, 0.67, 0.82]; // horizontal
+        const ROADS_V = [0.18, 0.35, 0.52, 0.68, 0.84]; // vertical
+
+        // ── Hotspot locations (fraction of canvas) ──
+        const HOTSPOTS = [
+            { x:0.35, y:0.20, name:'Jubilee Hills',    severity:'critical' },
+            { x:0.68, y:0.32, name:'Banjara Hills',    severity:'high'     },
+            { x:0.25, y:0.50, name:'MGBS Flyover',     severity:'critical' },
+            { x:0.72, y:0.55, name:'Uppal Ring Road',  severity:'high'     },
+            { x:0.45, y:0.70, name:'Dilsukhnagar',     severity:'medium'   },
+            { x:0.18, y:0.78, name:'LB Nagar',         severity:'medium'   },
+            { x:0.80, y:0.75, name:'SR Nagar',         severity:'low'      },
+            { x:0.55, y:0.42, name:'Ameerpet',         severity:'low'      },
+        ];
+
+        // ── Phase colors ──
+        const PHASES = [
+            {
+                light:  'red',
+                label:  '🔴 CRITICAL HAZARDS',
+                color:  '#FF1744',
+                show:   ['critical'],
+                pulse:  'rgba(255,23,68,',
+                border: 'rgba(255,23,68,0.6)'
+            },
+            {
+                light:  'amber',
+                label:  '🟡 HIGH RISK ZONES',
+                color:  '#FFD600',
+                show:   ['critical','high'],
+                pulse:  'rgba(255,214,0,',
+                border: 'rgba(255,214,0,0.6)'
+            },
+            {
+                light:  'green',
+                label:  '🟢 ALL CLEAR — SAFE',
+                color:  '#00E676',
+                show:   ['critical','high','medium','low'],
+                pulse:  'rgba(0,230,118,',
+                border: 'rgba(0,230,118,0.4)'
+            }
+        ];
+
+        // ── State ──
+        let phase       = 0;          // 0=red, 1=amber, 2=green
+        let phaseTimer  = 0;
+        const PHASE_DUR = [200, 120, 180]; // frames each phase stays
+        let frame       = 0;
+        let animId;
+
+        // ── Draw background map ──
+        function drawMap() {
+            const W = canvas.width, H = canvas.height;
+
+            // Dark background
+            ctx.fillStyle = '#060d1f';
+            ctx.fillRect(0, 0, W, H);
+
+            // Grid glow
+            const grad = ctx.createRadialGradient(W*0.5,H*0.5, 0, W*0.5,H*0.5, W*0.7);
+            grad.addColorStop(0, 'rgba(0,100,180,0.12)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, H);
+
+            // Roads
+            ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+            ctx.lineWidth   = 1;
+
+            ROADS_H.forEach(fy => {
+                ctx.beginPath();
+                ctx.moveTo(0, H*fy);
+                ctx.lineTo(W, H*fy);
+                ctx.stroke();
+            });
+            ROADS_V.forEach(fx => {
+                ctx.beginPath();
+                ctx.moveTo(W*fx, 0);
+                ctx.lineTo(W*fx, H);
+                ctx.stroke();
+            });
+
+            // Major roads (thicker)
+            ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+            ctx.lineWidth   = 2;
+            [[0,H*0.50,W,H*0.50],[0,H*0.32,W,H*0.32]].forEach(([x1,y1,x2,y2]) => {
+                ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+            });
+            [[W*0.52,0,W*0.52,H],[W*0.35,0,W*0.35,H]].forEach(([x1,y1,x2,y2]) => {
+                ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+            });
+        }
+
+        // ── Draw one hazard pin ──
+        function drawPin(px, py, color, pulseR, alpha, emoji) {
+            const W = canvas.width, H = canvas.height;
+            const x = W * px, y = H * py;
+
+            // Pulse ring
+            if (pulseR > 0) {
+                ctx.beginPath();
+                ctx.arc(x, y, pulseR, 0, Math.PI*2);
+                ctx.strokeStyle = color.replace('1)', (0.35 * (1 - pulseR/40)) + ')');
+                ctx.lineWidth   = 1.5;
+                ctx.stroke();
+            }
+
+            // Glow halo
+            const glow = ctx.createRadialGradient(x, y, 0, x, y, 18);
+            glow.addColorStop(0, color.replace('1)', '0.5)'));
+            glow.addColorStop(1, color.replace('1)', '0)'));
+            ctx.fillStyle = glow;
+            ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI*2); ctx.fill();
+
+            // Pin body (teardrop: circle + triangle pointing down)
+            ctx.fillStyle = color.replace('1)', alpha + ')');
+            ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+            ctx.lineWidth   = 1.5;
+            ctx.beginPath();
+            ctx.arc(x, y - 8, 8, 0, Math.PI*2);
+            ctx.fill(); ctx.stroke();
+
+            // Triangle tip
+            ctx.beginPath();
+            ctx.moveTo(x - 5, y - 4);
+            ctx.lineTo(x + 5, y - 4);
+            ctx.lineTo(x,     y + 4);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            // Emoji label
+            ctx.font      = '11px Syne, sans-serif';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.fillText(emoji, x, y - 5);
+        }
+
+        // ── Main draw loop ──
+        function drawFrame() {
+            const W = canvas.width, H = canvas.height;
+            const p = PHASES[phase];
+            const t = frame / 60; // time in seconds
+
+            drawMap();
+
+            // Draw visible hotspots for this phase
+            HOTSPOTS.forEach(hs => {
+                if (!p.show.includes(hs.severity)) return;
+
+                const pulseT  = ((t * 1.8) + hs.x * 3) % 1; // staggered pulse
+                const pulseR  = pulseT * 38;
+                const pinAlpha = 0.85 + Math.sin(t * 2.5 + hs.x * 5) * 0.15;
+
+                const emoji = hs.severity === 'critical' ? '🔴'
+                    : hs.severity === 'high'     ? '🟠'
+                    : hs.severity === 'medium'   ? '🟡'
+                    : '🟢';
+
+                drawPin(hs.x, hs.y, p.pulse + '1)', pulseR, pinAlpha, emoji);
+            });
+
+            // ── Phase border glow ──
+            ctx.strokeStyle = p.border;
+            ctx.lineWidth   = 2;
+            ctx.strokeRect(1, 1, W-2, H-2);
+
+            frame++;
+        }
+
+        // ── Signal light update ──
+        function updateSignal() {
+            const p = PHASES[phase];
+            document.getElementById('sig-red')?.classList.remove('on');
+            document.getElementById('sig-amber')?.classList.remove('on');
+            document.getElementById('sig-green')?.classList.remove('on');
+
+            if (p.light === 'red')   document.getElementById('sig-red')?.classList.add('on');
+            if (p.light === 'amber') document.getElementById('sig-amber')?.classList.add('on');
+            if (p.light === 'green') document.getElementById('sig-green')?.classList.add('on');
+
+            const label = document.getElementById('mapStatusLabel');
+            if (label) {
+                label.textContent = p.label;
+                label.style.borderColor = p.color + '55';
+                label.style.color       = p.color;
+            }
+        }
+
+        // ── Animation ticker ──
+        function tick() {
+            drawFrame();
+            phaseTimer++;
+            if (phaseTimer >= PHASE_DUR[phase]) {
+                phaseTimer = 0;
+                phase = (phase + 1) % 3;
+                updateSignal();
+            }
+            animId = requestAnimationFrame(tick);
+        }
+
+        // ── Start ──
+        updateSignal();
+        tick();
+
+        // ── Pause when tab is hidden ──
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) { cancelAnimationFrame(animId); }
+            else { frame = 0; tick(); }
+        });
+    })();
+    </script>
+</body>
+</html>
